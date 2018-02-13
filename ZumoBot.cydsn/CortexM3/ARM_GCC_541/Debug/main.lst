@@ -1,0 +1,4821 @@
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m3
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.thumb
+  14              		.syntax unified
+  15              		.file	"main.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.global	__aeabi_i2f
+  20              		.global	__aeabi_fdiv
+  21              		.global	__aeabi_fmul
+  22              		.section	.text.readBatteryVoltage,"ax",%progbits
+  23              		.align	2
+  24              		.global	readBatteryVoltage
+  25              		.thumb
+  26              		.thumb_func
+  27              		.type	readBatteryVoltage, %function
+  28              	readBatteryVoltage:
+  29              	.LFB65:
+  30              		.file 1 "main.c"
+   1:main.c        **** /**
+   2:main.c        **** * @mainpage ZumoBot Project
+   3:main.c        **** * @brief    You can make your own ZumoBot with various sensors.
+   4:main.c        **** * @details  <br><br>
+   5:main.c        ****     <p>
+   6:main.c        ****     <B>General</B><br>
+   7:main.c        ****     You will use Pololu Zumo Shields for your robot project with CY8CKIT-059(PSoC 5LP) from Cypress
+   8:main.c        ****     library has basic methods of various sensors and communications so that you can make what you w
+   9:main.c        ****     <br><br>
+  10:main.c        ****     </p>
+  11:main.c        ****     
+  12:main.c        ****     <p>
+  13:main.c        ****     <B>Sensors</B><br>
+  14:main.c        ****     &nbsp;Included: <br>
+  15:main.c        ****         &nbsp;&nbsp;&nbsp;&nbsp;LSM303D: Accelerometer & Magnetometer<br>
+  16:main.c        ****         &nbsp;&nbsp;&nbsp;&nbsp;L3GD20H: Gyroscope<br>
+  17:main.c        ****         &nbsp;&nbsp;&nbsp;&nbsp;Reflectance sensor<br>
+  18:main.c        ****         &nbsp;&nbsp;&nbsp;&nbsp;Motors
+  19:main.c        ****     &nbsp;Wii nunchuck<br>
+  20:main.c        ****     &nbsp;TSOP-2236: IR Receiver<br>
+  21:main.c        ****     &nbsp;HC-SR04: Ultrasonic sensor<br>
+  22:main.c        ****     &nbsp;APDS-9301: Ambient light sensor<br>
+  23:main.c        ****     &nbsp;IR LED <br><br><br>
+  24:main.c        ****     </p>
+  25:main.c        ****     
+  26:main.c        ****     <p>
+  27:main.c        ****     <B>Communication</B><br>
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 2
+
+
+  28:main.c        ****     I2C, UART, Serial<br>
+  29:main.c        ****     </p>
+  30:main.c        **** */
+  31:main.c        **** 
+  32:main.c        **** #include <project.h>
+  33:main.c        **** #include <stdio.h>
+  34:main.c        **** #include "Motor.h"
+  35:main.c        **** #include "Ultra.h"
+  36:main.c        **** #include "Nunchuk.h"
+  37:main.c        **** #include "Reflectance.h"
+  38:main.c        **** #include "I2C_made.h"
+  39:main.c        **** #include "Gyro.h"
+  40:main.c        **** #include "Accel_magnet.h"
+  41:main.c        **** #include "IR.h"
+  42:main.c        **** #include "Ambient.h"
+  43:main.c        **** #include "Beep.h"
+  44:main.c        **** 
+  45:main.c        **** int rread(void);
+  46:main.c        **** 
+  47:main.c        **** /**
+  48:main.c        ****  * @file    main.c
+  49:main.c        ****  * @brief   
+  50:main.c        ****  * @details  ** You should enable global interrupt for operating properly. **<br>&nbsp;&nbsp;&nbsp;
+  51:main.c        **** */
+  52:main.c        **** 
+  53:main.c        **** float readBatteryVoltage();
+  54:main.c        **** float getPIDValue(float, float, float*, float*);
+  55:main.c        **** 
+  56:main.c        **** //battery level//
+  57:main.c        **** int main()
+  58:main.c        **** {
+  59:main.c        ****     CyGlobalIntEnable; 
+  60:main.c        ****     UART_1_Start();
+  61:main.c        ****     ADC_Battery_Start();   
+  62:main.c        ****     
+  63:main.c        ****     sensor_isr_StartEx(sensor_isr_handler);
+  64:main.c        ****     reflectance_start();
+  65:main.c        ****     motor_start();
+  66:main.c        ****     IR_led_Write(1);
+  67:main.c        ****     
+  68:main.c        ****     struct sensors_ sensors;
+  69:main.c        ****     float volts = 0.0;
+  70:main.c        ****     int loopTime = 600000000;
+  71:main.c        ****     int ledTime = 0;
+  72:main.c        ****     int ledState = 0;
+  73:main.c        ****     int buttonState = 1;
+  74:main.c        ****     int buttonValue = 0;
+  75:main.c        ****     float speed = 255;
+  76:main.c        ****     
+  77:main.c        ****     float leftControl = 1;
+  78:main.c        ****     float rightControl = 1;
+  79:main.c        ****     
+  80:main.c        ****     int white[4] = { 0, 0, 0, 0 };
+  81:main.c        ****     int black[4] = { 0, 0, 0, 0 };
+  82:main.c        ****     float status[4] = { 0, 0, 0, 0 };
+  83:main.c        ****     
+  84:main.c        ****     int lastLeft = 0;
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 3
+
+
+  85:main.c        ****     int lastRight = 0;
+  86:main.c        ****     
+  87:main.c        ****     float lastErrorRight = 0;
+  88:main.c        ****     float lastErrorLeft = 0;
+  89:main.c        ****     
+  90:main.c        ****     float intergalRight = 0;
+  91:main.c        ****     float intergalLeft = 0;
+  92:main.c        ****     
+  93:main.c        ****     int delay = 10;
+  94:main.c        ****     
+  95:main.c        ****     int state = 1;
+  96:main.c        ****     int start = 0;
+  97:main.c        ****     int stop = 0;
+  98:main.c        ****     int stopCount = 0;
+  99:main.c        **** 
+ 100:main.c        ****     printf("\nBoot\n");
+ 101:main.c        **** 
+ 102:main.c        ****     //BatteryLed_Write(1); // Switch led on 
+ 103:main.c        ****     BatteryLed_Write(0); // Switch led off 
+ 104:main.c        ****     //uint8 button;
+ 105:main.c        ****     //button = SW1_Read(); // read SW1 on pSoC board
+ 106:main.c        ****     
+ 107:main.c        ****     motor_forward(0, 10);
+ 108:main.c        **** 
+ 109:main.c        ****     for(;;)
+ 110:main.c        ****     {
+ 111:main.c        ****         ledTime++;
+ 112:main.c        ****         
+ 113:main.c        ****         if (loopTime >= 3000 * (100 / delay)) {
+ 114:main.c        ****             volts = readBatteryVoltage();
+ 115:main.c        ****             printf("Calculated voltage %f\r\n", volts);
+ 116:main.c        ****             loopTime = 0;
+ 117:main.c        ****         }
+ 118:main.c        ****         
+ 119:main.c        ****         if (volts <= 4 && volts != 0) {
+ 120:main.c        ****             if (ledTime >= 50 * (100 / delay)) {
+ 121:main.c        ****                 ledState = !ledState;
+ 122:main.c        ****                 BatteryLed_Write(ledState);
+ 123:main.c        ****                 ledTime = 0;
+ 124:main.c        ****             }
+ 125:main.c        ****             
+ 126:main.c        ****             continue;
+ 127:main.c        ****         } else if (ledState == 1) {
+ 128:main.c        ****             ledState = !ledState;
+ 129:main.c        ****             BatteryLed_Write(ledState);
+ 130:main.c        ****         }
+ 131:main.c        ****         
+ 132:main.c        ****         int button = SW1_Read();
+ 133:main.c        ****         if (!button && buttonState) {
+ 134:main.c        ****             buttonState = 0;
+ 135:main.c        ****             buttonValue = 0; 
+ 136:main.c        ****         } else {
+ 137:main.c        ****             buttonValue = 1;
+ 138:main.c        ****         }
+ 139:main.c        ****         
+ 140:main.c        ****         if (button && !buttonState) buttonState = 1;
+ 141:main.c        ****         
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 4
+
+
+ 142:main.c        ****         /*printf("State %d \n", button);
+ 143:main.c        ****         
+ 144:main.c        ****         if (buttonState != 0 && button == 0) {
+ 145:main.c        ****             buttonValue = !buttonValue;
+ 146:main.c        ****             buttonState = 0;
+ 147:main.c        ****         } else if (buttonState == 0 && button == 1) {
+ 148:main.c        ****             buttonState = 1;
+ 149:main.c        ****         }*/
+ 150:main.c        ****         
+ 151:main.c        ****         switch (state) {
+ 152:main.c        ****             case 1:
+ 153:main.c        ****                 if (ledTime >= 100 * (100 / delay)) {
+ 154:main.c        ****                     ledState = !ledState;
+ 155:main.c        ****                     BatteryLed_Write(ledState);
+ 156:main.c        ****                     ledTime = 0;
+ 157:main.c        ****                 }
+ 158:main.c        ****                 
+ 159:main.c        ****                 if (buttonValue == 0) {
+ 160:main.c        ****                     reflectance_read(&sensors);
+ 161:main.c        ****                     white[0] = sensors.l3;
+ 162:main.c        ****                     white[1] = sensors.l1;
+ 163:main.c        ****                     white[2] = sensors.r1;
+ 164:main.c        ****                     white[3] = sensors.r3;
+ 165:main.c        ****                     
+ 166:main.c        ****                     Beep(10, 100);
+ 167:main.c        ****                     
+ 168:main.c        ****                     state++;
+ 169:main.c        ****                 }
+ 170:main.c        ****                 
+ 171:main.c        ****                 // leftControl = getPIDValue(leftControl, button, &intergalLeft, &lastErrorLeft); 
+ 172:main.c        ****                 // printf("%f \n", leftControl);
+ 173:main.c        ****                 
+ 174:main.c        ****                 break;
+ 175:main.c        ****                 
+ 176:main.c        ****             case 2:
+ 177:main.c        ****                 if (ledTime >= 200 * (delay / 100)) {
+ 178:main.c        ****                     ledState = !ledState;
+ 179:main.c        ****                     BatteryLed_Write(ledState);
+ 180:main.c        ****                     ledTime = 0;
+ 181:main.c        ****                 }
+ 182:main.c        ****                 
+ 183:main.c        ****                 if (buttonValue == 0) {
+ 184:main.c        ****                     reflectance_read(&sensors);
+ 185:main.c        ****                     black[0] = sensors.l3;
+ 186:main.c        ****                     black[1] = sensors.l1;
+ 187:main.c        ****                     black[2] = sensors.r1;
+ 188:main.c        ****                     black[3] = sensors.r3;
+ 189:main.c        ****                     
+ 190:main.c        ****                     Beep(10, 200);
+ 191:main.c        ****                     
+ 192:main.c        ****                     state++;
+ 193:main.c        ****                 }
+ 194:main.c        ****                 
+ 195:main.c        ****                 break;
+ 196:main.c        ****                 
+ 197:main.c        ****             case 3:
+ 198:main.c        ****                 printf("%d - %d - %d - %d \n", white[0], white[1], white[2], white[3]);
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 5
+
+
+ 199:main.c        ****                 printf("%d - %d - %d - %d \n", black[0], black[1], black[2], black[3]);
+ 200:main.c        ****                 
+ 201:main.c        ****                 Beep(20, 200);
+ 202:main.c        ****                 Beep(10, 100);
+ 203:main.c        ****                 
+ 204:main.c        ****                 state++;
+ 205:main.c        ****                 break;
+ 206:main.c        ****                 
+ 207:main.c        ****             case 4:
+ 208:main.c        ****                 reflectance_read(&sensors);
+ 209:main.c        ****                 status[0] = (float)(sensors.l3 - white[0]) / (float)(black[0] - white[0]);
+ 210:main.c        ****                 status[1] = (float)(sensors.l1 - white[1]) / (float)(black[1] - white[1]);
+ 211:main.c        ****                 status[2] = (float)(sensors.r1 - white[2]) / (float)(black[2] - white[2]);
+ 212:main.c        ****                 status[3] = (float)(sensors.r3 - white[3]) / (float)(black[3] - white[3]);
+ 213:main.c        ****                 
+ 214:main.c        ****                 // printf("%f, %f, %f, %f \n", status[0], status[1], status[2], status[3]);
+ 215:main.c        ****                 
+ 216:main.c        ****                 int left = 0;
+ 217:main.c        ****                 int right = 0;
+ 218:main.c        ****                 
+ 219:main.c        ****                 float over = 0.2;
+ 220:main.c        ****                 if (status[1] > over) {
+ 221:main.c        ****                     right = 1;
+ 222:main.c        ****                 }
+ 223:main.c        ****                 
+ 224:main.c        ****                 if (status[0] > over) {
+ 225:main.c        ****                     right = 2;
+ 226:main.c        ****                 }
+ 227:main.c        ****                 
+ 228:main.c        ****                 if (status[2] > over) {
+ 229:main.c        ****                     left = 1;
+ 230:main.c        ****                 }
+ 231:main.c        ****                 
+ 232:main.c        ****                 if (status[3] > over) {
+ 233:main.c        ****                     left = 2;
+ 234:main.c        ****                 }
+ 235:main.c        ****                 
+ 236:main.c        ****                 // printf("%d, %d \n", left, right);
+ 237:main.c        ****                 
+ 238:main.c        ****                 if ((lastLeft == 2 || lastRight == 2) && (left == 0 && right == 0)) {
+ 239:main.c        ****                     left = lastLeft;
+ 240:main.c        ****                     right = lastRight;
+ 241:main.c        ****                 }
+ 242:main.c        ****           
+ 243:main.c        ****                 if (left == 0 && right == 0) {
+ 244:main.c        ****                     left = 1;
+ 245:main.c        ****                     right = 1;
+ 246:main.c        ****                 }
+ 247:main.c        ****                 
+ 248:main.c        ****                 if (left == 2 && right == 2) {
+ 249:main.c        ****                     left = 1;
+ 250:main.c        ****                     right = 1;
+ 251:main.c        ****                 }
+ 252:main.c        ****                 
+ 253:main.c        ****                 lastLeft = left;
+ 254:main.c        ****                 lastRight = right;
+ 255:main.c        ****                 
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 6
+
+
+ 256:main.c        ****                 float leftSpeed = left > 0 ? speed : 0;
+ 257:main.c        ****                 float rightSpeed = right > 0 ? speed : 0;
+ 258:main.c        ****                 
+ 259:main.c        ****                 //if (left == 1 && right == 0) rightSpeed = 0.35 * speed;
+ 260:main.c        ****                 //if (right == 1 && left == 0) leftSpeed = 0.35 * speed;
+ 261:main.c        ****                 
+ 262:main.c        ****                 leftControl = getPIDValue(leftControl, (right == 0 || (right == left) ? 1 : 0), &in
+ 263:main.c        ****                 rightControl = getPIDValue(rightControl, (left == 0 || (right == left) ? 1 : 0), &i
+ 264:main.c        ****                 
+ 265:main.c        ****                 leftSpeed = leftControl * speed;
+ 266:main.c        ****                 rightSpeed = rightControl * speed;
+ 267:main.c        ****                
+ 268:main.c        ****                 if (left == 2) {
+ 269:main.c        ****                     rightSpeed = 0;
+ 270:main.c        ****                     leftSpeed = speed;
+ 271:main.c        ****                 }
+ 272:main.c        ****                 
+ 273:main.c        ****                 if (right == 2) {
+ 274:main.c        ****                     leftSpeed = 0;
+ 275:main.c        ****                     rightSpeed = speed;
+ 276:main.c        ****                 }
+ 277:main.c        ****                 
+ 278:main.c        ****                 /*if (status[0] > 0.9 && status[1] > 0.9 && status[2] > 0.9 && status[3] > 0.9 && s
+ 279:main.c        ****                     stop = 1;
+ 280:main.c        ****                 } else if (status[0] > 0.1 && status[1] > 0.1 && status[2] > 0.1 && status[3] > 0.1
+ 281:main.c        ****                     stop = 0;
+ 282:main.c        ****                     stopCount++;
+ 283:main.c        ****                 }*/
+ 284:main.c        ****                 
+ 285:main.c        ****                 if (stopCount == 2) {
+ 286:main.c        ****                     leftSpeed = speed;
+ 287:main.c        ****                     rightSpeed = speed;
+ 288:main.c        ****                 }
+ 289:main.c        ****                 
+ 290:main.c        ****                 //printf("%d, %d \n", left, right);
+ 291:main.c        ****                 
+ 292:main.c        ****                 //printf("%d, %d \n", left, right);
+ 293:main.c        ****                 
+ 294:main.c        ****                 printf("%f, %f \n", leftSpeed, rightSpeed);
+ 295:main.c        ****                 
+ 296:main.c        ****                 //printf("%f, %f \n", leftSpeed, rightSpeed);
+ 297:main.c        ****                 
+ 298:main.c        ****                 ///*if (right == 1 && left == 0)*/ leftSpeed = leftControl * speed;
+ 299:main.c        ****                 ///*if (left == 1 && right == 0)*/ rightSpeed = rightControl * speed;
+ 300:main.c        ****                 
+ 301:main.c        ****                 motor_turn(leftSpeed, rightSpeed, delay);
+ 302:main.c        ****                 
+ 303:main.c        ****                 if (buttonValue == 0) state++;
+ 304:main.c        ****                 if (stopCount > 1) state++;
+ 305:main.c        ****                 
+ 306:main.c        ****                 break;
+ 307:main.c        ****                 
+ 308:main.c        ****             default:
+ 309:main.c        ****                 motor_forward(0, delay);
+ 310:main.c        ****                 if (buttonValue == 0) {
+ 311:main.c        ****                     speed += 25;
+ 312:main.c        ****                     state--;
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 7
+
+
+ 313:main.c        ****                 }
+ 314:main.c        ****                 break;
+ 315:main.c        ****         }
+ 316:main.c        ****         
+ 317:main.c        ****         
+ 318:main.c        ****         //reflectance_read(&sensors);
+ 319:main.c        ****         //printf("%d - %d - %d - %d \n", sensors.l3, sensors.l1, sensors.r1, sensors.r3);
+ 320:main.c        **** 
+ 321:main.c        ****         // BatteryLed_Write(buttonValue);
+ 322:main.c        ****         
+ 323:main.c        ****         CyDelay(delay);
+ 324:main.c        ****         loopTime++;
+ 325:main.c        ****     }
+ 326:main.c        ****  }   
+ 327:main.c        **** //*/
+ 328:main.c        **** 
+ 329:main.c        **** float readBatteryVoltage()
+ 330:main.c        **** {
+  31              		.loc 1 330 0
+  32              		.cfi_startproc
+  33              		@ args = 0, pretend = 0, frame = 0
+  34              		@ frame_needed = 0, uses_anonymous_args = 0
+  35 0000 08B5     		push	{r3, lr}
+  36              		.cfi_def_cfa_offset 8
+  37              		.cfi_offset 3, -8
+  38              		.cfi_offset 14, -4
+  39              	.LVL0:
+ 331:main.c        ****     int16 adcresult = 0;
+ 332:main.c        ****     ADC_Battery_StartConvert();
+  40              		.loc 1 332 0
+  41 0002 FFF7FEFF 		bl	ADC_Battery_StartConvert
+  42              	.LVL1:
+ 333:main.c        ****     if(ADC_Battery_IsEndConversion(ADC_Battery_WAIT_FOR_RESULT)) {
+  43              		.loc 1 333 0
+  44 0006 0020     		movs	r0, #0
+  45 0008 FFF7FEFF 		bl	ADC_Battery_IsEndConversion
+  46              	.LVL2:
+  47 000c 70B1     		cbz	r0, .L3
+ 334:main.c        ****         adcresult = ADC_Battery_GetResult16();
+  48              		.loc 1 334 0
+  49 000e FFF7FEFF 		bl	ADC_Battery_GetResult16
+  50              	.LVL3:
+ 335:main.c        ****         return ((float)adcresult / 4095) * 5 * 1.5;
+  51              		.loc 1 335 0
+  52 0012 FFF7FEFF 		bl	__aeabi_i2f
+  53              	.LVL4:
+  54 0016 0649     		ldr	r1, .L5
+  55 0018 FFF7FEFF 		bl	__aeabi_fdiv
+  56              	.LVL5:
+  57 001c 0549     		ldr	r1, .L5+4
+  58 001e FFF7FEFF 		bl	__aeabi_fmul
+  59              	.LVL6:
+  60 0022 4FF07F51 		mov	r1, #1069547520
+  61 0026 FFF7FEFF 		bl	__aeabi_fmul
+  62              	.LVL7:
+  63 002a 08BD     		pop	{r3, pc}
+  64              	.LVL8:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 8
+
+
+  65              	.L3:
+ 336:main.c        ****     }
+ 337:main.c        ****     return 0;
+  66              		.loc 1 337 0
+  67 002c 0020     		movs	r0, #0
+ 338:main.c        **** }
+  68              		.loc 1 338 0
+  69 002e 08BD     		pop	{r3, pc}
+  70              	.L6:
+  71              		.align	2
+  72              	.L5:
+  73 0030 00F07F45 		.word	1166012416
+  74 0034 0000A040 		.word	1084227584
+  75              		.cfi_endproc
+  76              	.LFE65:
+  77              		.size	readBatteryVoltage, .-readBatteryVoltage
+  78              		.global	__aeabi_fsub
+  79              		.global	__aeabi_fadd
+  80              		.global	__aeabi_fcmpgt
+  81              		.global	__aeabi_fcmplt
+  82              		.section	.text.getPIDValue,"ax",%progbits
+  83              		.align	2
+  84              		.global	getPIDValue
+  85              		.thumb
+  86              		.thumb_func
+  87              		.type	getPIDValue, %function
+  88              	getPIDValue:
+  89              	.LFB66:
+ 339:main.c        **** 
+ 340:main.c        **** float getPIDValue(float current, float target, float *integral, float *lastError)
+ 341:main.c        **** {
+  90              		.loc 1 341 0
+  91              		.cfi_startproc
+  92              		@ args = 0, pretend = 0, frame = 0
+  93              		@ frame_needed = 0, uses_anonymous_args = 0
+  94              	.LVL9:
+  95 0000 2DE9F041 		push	{r4, r5, r6, r7, r8, lr}
+  96              		.cfi_def_cfa_offset 24
+  97              		.cfi_offset 4, -24
+  98              		.cfi_offset 5, -20
+  99              		.cfi_offset 6, -16
+ 100              		.cfi_offset 7, -12
+ 101              		.cfi_offset 8, -8
+ 102              		.cfi_offset 14, -4
+ 103 0004 0C46     		mov	r4, r1
+ 104 0006 1746     		mov	r7, r2
+ 105 0008 1E46     		mov	r6, r3
+ 106              	.LVL10:
+ 342:main.c        ****     float kp = 0.45;
+ 343:main.c        ****     float ki = 0.045;
+ 344:main.c        ****     float kd = 0.2;
+ 345:main.c        **** 
+ 346:main.c        ****     float error = target - current;
+ 107              		.loc 1 346 0
+ 108 000a 0146     		mov	r1, r0
+ 109              	.LVL11:
+ 110 000c 2046     		mov	r0, r4
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 9
+
+
+ 111              	.LVL12:
+ 112 000e FFF7FEFF 		bl	__aeabi_fsub
+ 113              	.LVL13:
+ 114 0012 0446     		mov	r4, r0
+ 115              	.LVL14:
+ 347:main.c        ****     *integral = *integral + error;
+ 116              		.loc 1 347 0
+ 117 0014 3968     		ldr	r1, [r7]	@ float
+ 118 0016 FFF7FEFF 		bl	__aeabi_fadd
+ 119              	.LVL15:
+ 120 001a 0546     		mov	r5, r0
+ 121 001c 3860     		str	r0, [r7]	@ float
+ 348:main.c        ****     float derivate = error - *lastError;
+ 122              		.loc 1 348 0
+ 123 001e 3168     		ldr	r1, [r6]	@ float
+ 124 0020 2046     		mov	r0, r4
+ 125 0022 FFF7FEFF 		bl	__aeabi_fsub
+ 126              	.LVL16:
+ 127 0026 0746     		mov	r7, r0
+ 128              	.LVL17:
+ 349:main.c        ****     
+ 350:main.c        ****     float pwm = (kp * error) + (ki * *integral) + (kd * derivate);
+ 129              		.loc 1 350 0
+ 130 0028 1449     		ldr	r1, .L12
+ 131 002a 2046     		mov	r0, r4
+ 132              	.LVL18:
+ 133 002c FFF7FEFF 		bl	__aeabi_fmul
+ 134              	.LVL19:
+ 135 0030 8046     		mov	r8, r0
+ 136 0032 1349     		ldr	r1, .L12+4
+ 137 0034 2846     		mov	r0, r5
+ 138 0036 FFF7FEFF 		bl	__aeabi_fmul
+ 139              	.LVL20:
+ 140 003a 0146     		mov	r1, r0
+ 141 003c 4046     		mov	r0, r8
+ 142 003e FFF7FEFF 		bl	__aeabi_fadd
+ 143              	.LVL21:
+ 144 0042 0546     		mov	r5, r0
+ 145 0044 0F49     		ldr	r1, .L12+8
+ 146 0046 3846     		mov	r0, r7
+ 147 0048 FFF7FEFF 		bl	__aeabi_fmul
+ 148              	.LVL22:
+ 149 004c 0146     		mov	r1, r0
+ 150 004e 2846     		mov	r0, r5
+ 151 0050 FFF7FEFF 		bl	__aeabi_fadd
+ 152              	.LVL23:
+ 153 0054 0546     		mov	r5, r0
+ 154              	.LVL24:
+ 351:main.c        **** 
+ 352:main.c        ****     if (pwm > 1) pwm = 1;
+ 155              		.loc 1 352 0
+ 156 0056 4FF07E51 		mov	r1, #1065353216
+ 157 005a FFF7FEFF 		bl	__aeabi_fcmpgt
+ 158              	.LVL25:
+ 159 005e 28B9     		cbnz	r0, .L9
+ 353:main.c        ****     else if (pwm < 0) pwm = 0;
+ 160              		.loc 1 353 0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 10
+
+
+ 161 0060 0021     		movs	r1, #0
+ 162 0062 2846     		mov	r0, r5
+ 163 0064 FFF7FEFF 		bl	__aeabi_fcmplt
+ 164              	.LVL26:
+ 165 0068 20B1     		cbz	r0, .L8
+ 166 006a 02E0     		b	.L10
+ 167              	.L9:
+ 352:main.c        ****     else if (pwm < 0) pwm = 0;
+ 168              		.loc 1 352 0
+ 169 006c 4FF07E55 		mov	r5, #1065353216
+ 170              	.LVL27:
+ 171 0070 00E0     		b	.L8
+ 172              	.LVL28:
+ 173              	.L10:
+ 174              		.loc 1 353 0
+ 175 0072 0025     		movs	r5, #0
+ 176              	.LVL29:
+ 177              	.L8:
+ 354:main.c        ****     
+ 355:main.c        ****     
+ 356:main.c        ****     *lastError = error;
+ 178              		.loc 1 356 0
+ 179 0074 3460     		str	r4, [r6]	@ float
+ 357:main.c        ****     
+ 358:main.c        ****     return pwm;
+ 359:main.c        **** }
+ 180              		.loc 1 359 0
+ 181 0076 2846     		mov	r0, r5
+ 182 0078 BDE8F081 		pop	{r4, r5, r6, r7, r8, pc}
+ 183              	.LVL30:
+ 184              	.L13:
+ 185              		.align	2
+ 186              	.L12:
+ 187 007c 6666E63E 		.word	1055286886
+ 188 0080 EC51383D 		.word	1027101164
+ 189 0084 CDCC4C3E 		.word	1045220557
+ 190              		.cfi_endproc
+ 191              	.LFE66:
+ 192              		.size	getPIDValue, .-getPIDValue
+ 193              		.global	__aeabi_f2d
+ 194              		.global	__aeabi_fcmple
+ 195              		.global	__aeabi_fcmpeq
+ 196              		.global	__aeabi_f2uiz
+ 197              		.section	.text.main,"ax",%progbits
+ 198              		.align	2
+ 199              		.global	main
+ 200              		.thumb
+ 201              		.thumb_func
+ 202              		.type	main, %function
+ 203              	main:
+ 204              	.LFB64:
+  58:main.c        ****     CyGlobalIntEnable; 
+ 205              		.loc 1 58 0
+ 206              		.cfi_startproc
+ 207              		@ args = 0, pretend = 0, frame = 104
+ 208              		@ frame_needed = 0, uses_anonymous_args = 0
+ 209 0000 2DE9F04F 		push	{r4, r5, r6, r7, r8, r9, r10, fp, lr}
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 11
+
+
+ 210              		.cfi_def_cfa_offset 36
+ 211              		.cfi_offset 4, -36
+ 212              		.cfi_offset 5, -32
+ 213              		.cfi_offset 6, -28
+ 214              		.cfi_offset 7, -24
+ 215              		.cfi_offset 8, -20
+ 216              		.cfi_offset 9, -16
+ 217              		.cfi_offset 10, -12
+ 218              		.cfi_offset 11, -8
+ 219              		.cfi_offset 14, -4
+ 220 0004 9DB0     		sub	sp, sp, #116
+ 221              		.cfi_def_cfa_offset 152
+  59:main.c        ****     UART_1_Start();
+ 222              		.loc 1 59 0
+ 223              		.syntax unified
+ 224              	@ 59 "main.c" 1
+ 225 0006 62B6     		CPSIE   i
+ 226              	@ 0 "" 2
+  60:main.c        ****     ADC_Battery_Start();   
+ 227              		.loc 1 60 0
+ 228              		.thumb
+ 229              		.syntax unified
+ 230 0008 FFF7FEFF 		bl	UART_1_Start
+ 231              	.LVL31:
+  61:main.c        ****     
+ 232              		.loc 1 61 0
+ 233 000c FFF7FEFF 		bl	ADC_Battery_Start
+ 234              	.LVL32:
+  63:main.c        ****     reflectance_start();
+ 235              		.loc 1 63 0
+ 236 0010 A848     		ldr	r0, .L66
+ 237 0012 FFF7FEFF 		bl	sensor_isr_StartEx
+ 238              	.LVL33:
+  64:main.c        ****     motor_start();
+ 239              		.loc 1 64 0
+ 240 0016 FFF7FEFF 		bl	reflectance_start
+ 241              	.LVL34:
+  65:main.c        ****     IR_led_Write(1);
+ 242              		.loc 1 65 0
+ 243 001a FFF7FEFF 		bl	motor_start
+ 244              	.LVL35:
+  66:main.c        ****     
+ 245              		.loc 1 66 0
+ 246 001e 0120     		movs	r0, #1
+ 247 0020 FFF7FEFF 		bl	IR_led_Write
+ 248              	.LVL36:
+  80:main.c        ****     int black[4] = { 0, 0, 0, 0 };
+ 249              		.loc 1 80 0
+ 250 0024 0025     		movs	r5, #0
+ 251 0026 1695     		str	r5, [sp, #88]
+ 252 0028 1795     		str	r5, [sp, #92]
+ 253 002a 1895     		str	r5, [sp, #96]
+ 254 002c 1995     		str	r5, [sp, #100]
+  81:main.c        ****     float status[4] = { 0, 0, 0, 0 };
+ 255              		.loc 1 81 0
+ 256 002e 1295     		str	r5, [sp, #72]
+ 257 0030 1395     		str	r5, [sp, #76]
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 12
+
+
+ 258 0032 1495     		str	r5, [sp, #80]
+ 259 0034 1595     		str	r5, [sp, #84]
+ 260              	.LVL37:
+  87:main.c        ****     float lastErrorLeft = 0;
+ 261              		.loc 1 87 0
+ 262 0036 0026     		movs	r6, #0
+ 263 0038 1196     		str	r6, [sp, #68]	@ float
+  88:main.c        ****     
+ 264              		.loc 1 88 0
+ 265 003a 1096     		str	r6, [sp, #64]	@ float
+  90:main.c        ****     float intergalLeft = 0;
+ 266              		.loc 1 90 0
+ 267 003c 0F96     		str	r6, [sp, #60]	@ float
+  91:main.c        ****     
+ 268              		.loc 1 91 0
+ 269 003e 0E96     		str	r6, [sp, #56]	@ float
+ 270              	.LVL38:
+ 100:main.c        **** 
+ 271              		.loc 1 100 0
+ 272 0040 9D48     		ldr	r0, .L66+4
+ 273 0042 FFF7FEFF 		bl	puts
+ 274              	.LVL39:
+ 103:main.c        ****     //uint8 button;
+ 275              		.loc 1 103 0
+ 276 0046 2846     		mov	r0, r5
+ 277 0048 FFF7FEFF 		bl	BatteryLed_Write
+ 278              	.LVL40:
+ 107:main.c        **** 
+ 279              		.loc 1 107 0
+ 280 004c 0A21     		movs	r1, #10
+ 281 004e 2846     		mov	r0, r5
+ 282 0050 FFF7FEFF 		bl	motor_forward
+ 283              	.LVL41:
+  95:main.c        ****     int start = 0;
+ 284              		.loc 1 95 0
+ 285 0054 4FF0010A 		mov	r10, #1
+  85:main.c        ****     
+ 286              		.loc 1 85 0
+ 287 0058 0495     		str	r5, [sp, #16]
+  84:main.c        ****     int lastRight = 0;
+ 288              		.loc 1 84 0
+ 289 005a A846     		mov	r8, r5
+  78:main.c        ****     
+ 290              		.loc 1 78 0
+ 291 005c 4FF07E53 		mov	r3, #1065353216
+ 292 0060 0793     		str	r3, [sp, #28]	@ float
+  77:main.c        ****     float rightControl = 1;
+ 293              		.loc 1 77 0
+ 294 0062 0693     		str	r3, [sp, #24]	@ float
+  75:main.c        ****     
+ 295              		.loc 1 75 0
+ 296 0064 954B     		ldr	r3, .L66+8
+ 297 0066 0A93     		str	r3, [sp, #40]	@ float
+  73:main.c        ****     int buttonValue = 0;
+ 298              		.loc 1 73 0
+ 299 0068 D346     		mov	fp, r10
+  72:main.c        ****     int buttonState = 1;
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 13
+
+
+ 300              		.loc 1 72 0
+ 301 006a A946     		mov	r9, r5
+  70:main.c        ****     int ledTime = 0;
+ 302              		.loc 1 70 0
+ 303 006c 944C     		ldr	r4, .L66+12
+  69:main.c        ****     int loopTime = 600000000;
+ 304              		.loc 1 69 0
+ 305 006e 0396     		str	r6, [sp, #12]	@ float
+ 306              	.LVL42:
+ 307              	.L15:
+ 308              	.LBB2:
+ 111:main.c        ****         
+ 309              		.loc 1 111 0
+ 310 0070 0135     		adds	r5, r5, #1
+ 311              	.LVL43:
+ 113:main.c        ****             volts = readBatteryVoltage();
+ 312              		.loc 1 113 0
+ 313 0072 47F22F53 		movw	r3, #29999
+ 314 0076 9C42     		cmp	r4, r3
+ 315 0078 0ADD     		ble	.L16
+ 114:main.c        ****             printf("Calculated voltage %f\r\n", volts);
+ 316              		.loc 1 114 0
+ 317 007a FFF7FEFF 		bl	readBatteryVoltage
+ 318              	.LVL44:
+ 319 007e 0390     		str	r0, [sp, #12]	@ float
+ 320              	.LVL45:
+ 115:main.c        ****             loopTime = 0;
+ 321              		.loc 1 115 0
+ 322 0080 FFF7FEFF 		bl	__aeabi_f2d
+ 323              	.LVL46:
+ 324 0084 0246     		mov	r2, r0
+ 325 0086 0B46     		mov	r3, r1
+ 326 0088 8E48     		ldr	r0, .L66+16
+ 327 008a FFF7FEFF 		bl	printf
+ 328              	.LVL47:
+ 116:main.c        ****         }
+ 329              		.loc 1 116 0
+ 330 008e 0024     		movs	r4, #0
+ 331              	.LVL48:
+ 332              	.L16:
+ 119:main.c        ****             if (ledTime >= 50 * (100 / delay)) {
+ 333              		.loc 1 119 0
+ 334 0090 4FF08141 		mov	r1, #1082130432
+ 335 0094 039E     		ldr	r6, [sp, #12]	@ float
+ 336 0096 3046     		mov	r0, r6
+ 337 0098 FFF7FEFF 		bl	__aeabi_fcmple
+ 338              	.LVL49:
+ 339 009c 70B1     		cbz	r0, .L17
+ 119:main.c        ****             if (ledTime >= 50 * (100 / delay)) {
+ 340              		.loc 1 119 0 is_stmt 0 discriminator 1
+ 341 009e 0021     		movs	r1, #0
+ 342 00a0 3046     		mov	r0, r6
+ 343 00a2 FFF7FEFF 		bl	__aeabi_fcmpeq
+ 344              	.LVL50:
+ 345 00a6 48B9     		cbnz	r0, .L17
+ 120:main.c        ****                 ledState = !ledState;
+ 346              		.loc 1 120 0 is_stmt 1
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 14
+
+
+ 347 00a8 B5F5FA7F 		cmp	r5, #500
+ 348 00ac E0DB     		blt	.L15
+ 121:main.c        ****                 BatteryLed_Write(ledState);
+ 349              		.loc 1 121 0
+ 350 00ae 89F00109 		eor	r9, r9, #1
+ 351              	.LVL51:
+ 122:main.c        ****                 ledTime = 0;
+ 352              		.loc 1 122 0
+ 353 00b2 4846     		mov	r0, r9
+ 354 00b4 FFF7FEFF 		bl	BatteryLed_Write
+ 355              	.LVL52:
+ 123:main.c        ****             }
+ 356              		.loc 1 123 0
+ 357 00b8 0025     		movs	r5, #0
+ 126:main.c        ****         } else if (ledState == 1) {
+ 358              		.loc 1 126 0
+ 359 00ba D9E7     		b	.L15
+ 360              	.LVL53:
+ 361              	.L17:
+ 127:main.c        ****             ledState = !ledState;
+ 362              		.loc 1 127 0
+ 363 00bc B9F1000F 		cmp	r9, #0
+ 364 00c0 04D0     		beq	.L22
+ 128:main.c        ****             BatteryLed_Write(ledState);
+ 365              		.loc 1 128 0
+ 366 00c2 89F00109 		eor	r9, r9, #1
+ 367              	.LVL54:
+ 129:main.c        ****         }
+ 368              		.loc 1 129 0
+ 369 00c6 4846     		mov	r0, r9
+ 370 00c8 FFF7FEFF 		bl	BatteryLed_Write
+ 371              	.LVL55:
+ 372              	.L22:
+ 132:main.c        ****         if (!button && buttonState) {
+ 373              		.loc 1 132 0
+ 374 00cc FFF7FEFF 		bl	SW1_Read
+ 375              	.LVL56:
+ 133:main.c        ****             buttonState = 0;
+ 376              		.loc 1 133 0
+ 377 00d0 0346     		mov	r3, r0
+ 378 00d2 20B9     		cbnz	r0, .L46
+ 133:main.c        ****             buttonState = 0;
+ 379              		.loc 1 133 0 is_stmt 0 discriminator 1
+ 380 00d4 BBF1000F 		cmp	fp, #0
+ 381 00d8 03D1     		bne	.L47
+ 137:main.c        ****         }
+ 382              		.loc 1 137 0 is_stmt 1
+ 383 00da 0127     		movs	r7, #1
+ 384 00dc 03E0     		b	.L23
+ 385              	.L46:
+ 386 00de 0127     		movs	r7, #1
+ 387 00e0 01E0     		b	.L23
+ 388              	.L47:
+ 135:main.c        ****         } else {
+ 389              		.loc 1 135 0
+ 390 00e2 0027     		movs	r7, #0
+ 134:main.c        ****             buttonValue = 0; 
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 15
+
+
+ 391              		.loc 1 134 0
+ 392 00e4 BB46     		mov	fp, r7
+ 393              	.LVL57:
+ 394              	.L23:
+ 140:main.c        ****         
+ 395              		.loc 1 140 0
+ 396 00e6 23B1     		cbz	r3, .L24
+ 140:main.c        ****         
+ 397              		.loc 1 140 0 is_stmt 0 discriminator 1
+ 398 00e8 BBF1000F 		cmp	fp, #0
+ 399 00ec 01D1     		bne	.L24
+ 140:main.c        ****         
+ 400              		.loc 1 140 0
+ 401 00ee 4FF0010B 		mov	fp, #1
+ 402              	.LVL58:
+ 403              	.L24:
+ 151:main.c        ****             case 1:
+ 404              		.loc 1 151 0 is_stmt 1
+ 405 00f2 0AF1FF33 		add	r3, r10, #-1
+ 406 00f6 032B     		cmp	r3, #3
+ 407 00f8 00F25281 		bhi	.L25
+ 408 00fc DFE803F0 		tbb	[pc, r3]
+ 409              	.L27:
+ 410 0100 02       		.byte	(.L26-.L27)/2
+ 411 0101 24       		.byte	(.L28-.L27)/2
+ 412 0102 45       		.byte	(.L29-.L27)/2
+ 413 0103 61       		.byte	(.L30-.L27)/2
+ 414              		.p2align 1
+ 415              	.L26:
+ 416              	.LBB3:
+ 153:main.c        ****                     ledState = !ledState;
+ 417              		.loc 1 153 0
+ 418 0104 B5F57A7F 		cmp	r5, #1000
+ 419 0108 05DB     		blt	.L31
+ 154:main.c        ****                     BatteryLed_Write(ledState);
+ 420              		.loc 1 154 0
+ 421 010a 89F00109 		eor	r9, r9, #1
+ 422              	.LVL59:
+ 155:main.c        ****                     ledTime = 0;
+ 423              		.loc 1 155 0
+ 424 010e 4846     		mov	r0, r9
+ 425              	.LVL60:
+ 426 0110 FFF7FEFF 		bl	BatteryLed_Write
+ 427              	.LVL61:
+ 156:main.c        ****                 }
+ 428              		.loc 1 156 0
+ 429 0114 0025     		movs	r5, #0
+ 430              	.LVL62:
+ 431              	.L31:
+ 159:main.c        ****                     reflectance_read(&sensors);
+ 432              		.loc 1 159 0
+ 433 0116 002F     		cmp	r7, #0
+ 434 0118 40F04E81 		bne	.L32
+ 160:main.c        ****                     white[0] = sensors.l3;
+ 435              		.loc 1 160 0
+ 436 011c 1AA8     		add	r0, sp, #104
+ 437 011e FFF7FEFF 		bl	reflectance_read
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 16
+
+
+ 438              	.LVL63:
+ 161:main.c        ****                     white[1] = sensors.l1;
+ 439              		.loc 1 161 0
+ 440 0122 BDF86830 		ldrh	r3, [sp, #104]
+ 441 0126 1693     		str	r3, [sp, #88]
+ 162:main.c        ****                     white[2] = sensors.r1;
+ 442              		.loc 1 162 0
+ 443 0128 BDF86A30 		ldrh	r3, [sp, #106]
+ 444 012c 1793     		str	r3, [sp, #92]
+ 163:main.c        ****                     white[3] = sensors.r3;
+ 445              		.loc 1 163 0
+ 446 012e BDF86C30 		ldrh	r3, [sp, #108]
+ 447 0132 1893     		str	r3, [sp, #96]
+ 164:main.c        ****                     
+ 448              		.loc 1 164 0
+ 449 0134 BDF86E30 		ldrh	r3, [sp, #110]
+ 450 0138 1993     		str	r3, [sp, #100]
+ 166:main.c        ****                     
+ 451              		.loc 1 166 0
+ 452 013a 6421     		movs	r1, #100
+ 453 013c 0A20     		movs	r0, #10
+ 454 013e FFF7FEFF 		bl	Beep
+ 455              	.LVL64:
+ 168:main.c        ****                 }
+ 456              		.loc 1 168 0
+ 457 0142 0AF1010A 		add	r10, r10, #1
+ 458              	.LVL65:
+ 459 0146 37E1     		b	.L32
+ 460              	.LVL66:
+ 461              	.L28:
+ 177:main.c        ****                     ledState = !ledState;
+ 462              		.loc 1 177 0
+ 463 0148 002D     		cmp	r5, #0
+ 464 014a 05DB     		blt	.L33
+ 178:main.c        ****                     BatteryLed_Write(ledState);
+ 465              		.loc 1 178 0
+ 466 014c 89F00109 		eor	r9, r9, #1
+ 467              	.LVL67:
+ 179:main.c        ****                     ledTime = 0;
+ 468              		.loc 1 179 0
+ 469 0150 4846     		mov	r0, r9
+ 470              	.LVL68:
+ 471 0152 FFF7FEFF 		bl	BatteryLed_Write
+ 472              	.LVL69:
+ 180:main.c        ****                 }
+ 473              		.loc 1 180 0
+ 474 0156 0025     		movs	r5, #0
+ 475              	.LVL70:
+ 476              	.L33:
+ 183:main.c        ****                     reflectance_read(&sensors);
+ 477              		.loc 1 183 0
+ 478 0158 002F     		cmp	r7, #0
+ 479 015a 40F02D81 		bne	.L32
+ 184:main.c        ****                     black[0] = sensors.l3;
+ 480              		.loc 1 184 0
+ 481 015e 1AA8     		add	r0, sp, #104
+ 482 0160 FFF7FEFF 		bl	reflectance_read
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 17
+
+
+ 483              	.LVL71:
+ 185:main.c        ****                     black[1] = sensors.l1;
+ 484              		.loc 1 185 0
+ 485 0164 BDF86830 		ldrh	r3, [sp, #104]
+ 486 0168 1293     		str	r3, [sp, #72]
+ 186:main.c        ****                     black[2] = sensors.r1;
+ 487              		.loc 1 186 0
+ 488 016a BDF86A30 		ldrh	r3, [sp, #106]
+ 489 016e 1393     		str	r3, [sp, #76]
+ 187:main.c        ****                     black[3] = sensors.r3;
+ 490              		.loc 1 187 0
+ 491 0170 BDF86C30 		ldrh	r3, [sp, #108]
+ 492 0174 1493     		str	r3, [sp, #80]
+ 188:main.c        ****                     
+ 493              		.loc 1 188 0
+ 494 0176 BDF86E30 		ldrh	r3, [sp, #110]
+ 495 017a 1593     		str	r3, [sp, #84]
+ 190:main.c        ****                     
+ 496              		.loc 1 190 0
+ 497 017c C821     		movs	r1, #200
+ 498 017e 0A20     		movs	r0, #10
+ 499 0180 FFF7FEFF 		bl	Beep
+ 500              	.LVL72:
+ 192:main.c        ****                 }
+ 501              		.loc 1 192 0
+ 502 0184 0AF1010A 		add	r10, r10, #1
+ 503              	.LVL73:
+ 504 0188 16E1     		b	.L32
+ 505              	.LVL74:
+ 506              	.L29:
+ 198:main.c        ****                 printf("%d - %d - %d - %d \n", black[0], black[1], black[2], black[3]);
+ 507              		.loc 1 198 0
+ 508 018a 4F4E     		ldr	r6, .L66+20
+ 509 018c 199B     		ldr	r3, [sp, #100]
+ 510 018e 0093     		str	r3, [sp]
+ 511 0190 189B     		ldr	r3, [sp, #96]
+ 512 0192 179A     		ldr	r2, [sp, #92]
+ 513 0194 1699     		ldr	r1, [sp, #88]
+ 514 0196 3046     		mov	r0, r6
+ 515              	.LVL75:
+ 516 0198 FFF7FEFF 		bl	printf
+ 517              	.LVL76:
+ 199:main.c        ****                 
+ 518              		.loc 1 199 0
+ 519 019c 159B     		ldr	r3, [sp, #84]
+ 520 019e 0093     		str	r3, [sp]
+ 521 01a0 149B     		ldr	r3, [sp, #80]
+ 522 01a2 139A     		ldr	r2, [sp, #76]
+ 523 01a4 1299     		ldr	r1, [sp, #72]
+ 524 01a6 3046     		mov	r0, r6
+ 525 01a8 FFF7FEFF 		bl	printf
+ 526              	.LVL77:
+ 201:main.c        ****                 Beep(10, 100);
+ 527              		.loc 1 201 0
+ 528 01ac C821     		movs	r1, #200
+ 529 01ae 1420     		movs	r0, #20
+ 530 01b0 FFF7FEFF 		bl	Beep
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 18
+
+
+ 531              	.LVL78:
+ 202:main.c        ****                 
+ 532              		.loc 1 202 0
+ 533 01b4 6421     		movs	r1, #100
+ 534 01b6 0A20     		movs	r0, #10
+ 535 01b8 FFF7FEFF 		bl	Beep
+ 536              	.LVL79:
+ 204:main.c        ****                 break;
+ 537              		.loc 1 204 0
+ 538 01bc 0AF1010A 		add	r10, r10, #1
+ 539              	.LVL80:
+ 205:main.c        ****                 
+ 540              		.loc 1 205 0
+ 541 01c0 FAE0     		b	.L32
+ 542              	.LVL81:
+ 543              	.L30:
+ 208:main.c        ****                 status[0] = (float)(sensors.l3 - white[0]) / (float)(black[0] - white[0]);
+ 544              		.loc 1 208 0
+ 545 01c2 1AA8     		add	r0, sp, #104
+ 546              	.LVL82:
+ 547 01c4 FFF7FEFF 		bl	reflectance_read
+ 548              	.LVL83:
+ 209:main.c        ****                 status[1] = (float)(sensors.l1 - white[1]) / (float)(black[1] - white[1]);
+ 549              		.loc 1 209 0
+ 550 01c8 BDF86800 		ldrh	r0, [sp, #104]
+ 551 01cc 169E     		ldr	r6, [sp, #88]
+ 552              	.LVL84:
+ 553 01ce 801B     		subs	r0, r0, r6
+ 554 01d0 FFF7FEFF 		bl	__aeabi_i2f
+ 555              	.LVL85:
+ 556 01d4 0590     		str	r0, [sp, #20]	@ float
+ 557 01d6 1298     		ldr	r0, [sp, #72]
+ 558 01d8 801B     		subs	r0, r0, r6
+ 559 01da FFF7FEFF 		bl	__aeabi_i2f
+ 560              	.LVL86:
+ 561 01de 0146     		mov	r1, r0
+ 562 01e0 0598     		ldr	r0, [sp, #20]	@ float
+ 563 01e2 FFF7FEFF 		bl	__aeabi_fdiv
+ 564              	.LVL87:
+ 565 01e6 0890     		str	r0, [sp, #32]	@ float
+ 210:main.c        ****                 status[2] = (float)(sensors.r1 - white[2]) / (float)(black[2] - white[2]);
+ 566              		.loc 1 210 0
+ 567 01e8 BDF86A00 		ldrh	r0, [sp, #106]
+ 568 01ec 179E     		ldr	r6, [sp, #92]
+ 569 01ee 801B     		subs	r0, r0, r6
+ 570 01f0 FFF7FEFF 		bl	__aeabi_i2f
+ 571              	.LVL88:
+ 572 01f4 0590     		str	r0, [sp, #20]	@ float
+ 573 01f6 1398     		ldr	r0, [sp, #76]
+ 574 01f8 801B     		subs	r0, r0, r6
+ 575 01fa FFF7FEFF 		bl	__aeabi_i2f
+ 576              	.LVL89:
+ 577 01fe 0146     		mov	r1, r0
+ 578 0200 0598     		ldr	r0, [sp, #20]	@ float
+ 579 0202 FFF7FEFF 		bl	__aeabi_fdiv
+ 580              	.LVL90:
+ 581 0206 0D90     		str	r0, [sp, #52]	@ float
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 19
+
+
+ 211:main.c        ****                 status[3] = (float)(sensors.r3 - white[3]) / (float)(black[3] - white[3]);
+ 582              		.loc 1 211 0
+ 583 0208 BDF86C00 		ldrh	r0, [sp, #108]
+ 584 020c 189E     		ldr	r6, [sp, #96]
+ 585 020e 801B     		subs	r0, r0, r6
+ 586 0210 FFF7FEFF 		bl	__aeabi_i2f
+ 587              	.LVL91:
+ 588 0214 0590     		str	r0, [sp, #20]	@ float
+ 589 0216 1498     		ldr	r0, [sp, #80]
+ 590 0218 801B     		subs	r0, r0, r6
+ 591 021a FFF7FEFF 		bl	__aeabi_i2f
+ 592              	.LVL92:
+ 593 021e 0146     		mov	r1, r0
+ 594 0220 0598     		ldr	r0, [sp, #20]	@ float
+ 595 0222 FFF7FEFF 		bl	__aeabi_fdiv
+ 596              	.LVL93:
+ 597 0226 0B90     		str	r0, [sp, #44]	@ float
+ 212:main.c        ****                 
+ 598              		.loc 1 212 0
+ 599 0228 BDF86E00 		ldrh	r0, [sp, #110]
+ 600 022c 199E     		ldr	r6, [sp, #100]
+ 601 022e 801B     		subs	r0, r0, r6
+ 602 0230 FFF7FEFF 		bl	__aeabi_i2f
+ 603              	.LVL94:
+ 604 0234 0590     		str	r0, [sp, #20]	@ float
+ 605 0236 1598     		ldr	r0, [sp, #84]
+ 606 0238 801B     		subs	r0, r0, r6
+ 607 023a FFF7FEFF 		bl	__aeabi_i2f
+ 608              	.LVL95:
+ 609 023e 0146     		mov	r1, r0
+ 610 0240 0598     		ldr	r0, [sp, #20]	@ float
+ 611 0242 FFF7FEFF 		bl	__aeabi_fdiv
+ 612              	.LVL96:
+ 613 0246 0C90     		str	r0, [sp, #48]	@ float
+ 614              	.LVL97:
+ 220:main.c        ****                     right = 1;
+ 615              		.loc 1 220 0
+ 616 0248 2049     		ldr	r1, .L66+24
+ 617 024a 0D98     		ldr	r0, [sp, #52]	@ float
+ 618 024c FFF7FEFF 		bl	__aeabi_fcmpgt
+ 619              	.LVL98:
+ 620 0250 10B9     		cbnz	r0, .L49
+ 217:main.c        ****                 
+ 621              		.loc 1 217 0
+ 622 0252 0023     		movs	r3, #0
+ 623 0254 0593     		str	r3, [sp, #20]
+ 624 0256 01E0     		b	.L34
+ 625              	.L49:
+ 221:main.c        ****                 }
+ 626              		.loc 1 221 0
+ 627 0258 0123     		movs	r3, #1
+ 628 025a 0593     		str	r3, [sp, #20]
+ 629              	.L34:
+ 630              	.LVL99:
+ 224:main.c        ****                     right = 2;
+ 631              		.loc 1 224 0
+ 632 025c 1B49     		ldr	r1, .L66+24
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 20
+
+
+ 633 025e 0898     		ldr	r0, [sp, #32]	@ float
+ 634 0260 FFF7FEFF 		bl	__aeabi_fcmpgt
+ 635              	.LVL100:
+ 636 0264 08B1     		cbz	r0, .L35
+ 225:main.c        ****                 }
+ 637              		.loc 1 225 0
+ 638 0266 0223     		movs	r3, #2
+ 639 0268 0593     		str	r3, [sp, #20]
+ 640              	.LVL101:
+ 641              	.L35:
+ 228:main.c        ****                     left = 1;
+ 642              		.loc 1 228 0
+ 643 026a 1849     		ldr	r1, .L66+24
+ 644 026c 0B98     		ldr	r0, [sp, #44]	@ float
+ 645 026e FFF7FEFF 		bl	__aeabi_fcmpgt
+ 646              	.LVL102:
+ 647 0272 08B9     		cbnz	r0, .L51
+ 216:main.c        ****                 int right = 0;
+ 648              		.loc 1 216 0
+ 649 0274 0026     		movs	r6, #0
+ 650 0276 00E0     		b	.L36
+ 651              	.L51:
+ 229:main.c        ****                 }
+ 652              		.loc 1 229 0
+ 653 0278 0126     		movs	r6, #1
+ 654              	.L36:
+ 655              	.LVL103:
+ 232:main.c        ****                     left = 2;
+ 656              		.loc 1 232 0
+ 657 027a 1449     		ldr	r1, .L66+24
+ 658 027c 0C98     		ldr	r0, [sp, #48]	@ float
+ 659 027e FFF7FEFF 		bl	__aeabi_fcmpgt
+ 660              	.LVL104:
+ 661 0282 00B1     		cbz	r0, .L37
+ 233:main.c        ****                 }
+ 662              		.loc 1 233 0
+ 663 0284 0226     		movs	r6, #2
+ 664              	.LVL105:
+ 665              	.L37:
+ 238:main.c        ****                     left = lastLeft;
+ 666              		.loc 1 238 0
+ 667 0286 B8F1020F 		cmp	r8, #2
+ 668 028a 02D0     		beq	.L38
+ 238:main.c        ****                     left = lastLeft;
+ 669              		.loc 1 238 0 is_stmt 0 discriminator 2
+ 670 028c 049B     		ldr	r3, [sp, #16]
+ 671 028e 022B     		cmp	r3, #2
+ 672 0290 05D1     		bne	.L39
+ 673              	.L38:
+ 238:main.c        ****                     left = lastLeft;
+ 674              		.loc 1 238 0 discriminator 3
+ 675 0292 26B9     		cbnz	r6, .L39
+ 238:main.c        ****                     left = lastLeft;
+ 676              		.loc 1 238 0 discriminator 4
+ 677 0294 059B     		ldr	r3, [sp, #20]
+ 678 0296 13B9     		cbnz	r3, .L39
+ 240:main.c        ****                 }
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 21
+
+
+ 679              		.loc 1 240 0 is_stmt 1
+ 680 0298 049B     		ldr	r3, [sp, #16]
+ 681 029a 0593     		str	r3, [sp, #20]
+ 682              	.LVL106:
+ 239:main.c        ****                     right = lastRight;
+ 683              		.loc 1 239 0
+ 684 029c 4646     		mov	r6, r8
+ 685              	.LVL107:
+ 686              	.L39:
+ 243:main.c        ****                     left = 1;
+ 687              		.loc 1 243 0
+ 688 029e 26B9     		cbnz	r6, .L54
+ 243:main.c        ****                     left = 1;
+ 689              		.loc 1 243 0 is_stmt 0 discriminator 1
+ 690 02a0 059B     		ldr	r3, [sp, #20]
+ 691 02a2 ABB1     		cbz	r3, .L55
+ 243:main.c        ****                     left = 1;
+ 692              		.loc 1 243 0
+ 693 02a4 0493     		str	r3, [sp, #16]
+ 694              	.LVL108:
+ 695 02a6 B046     		mov	r8, r6
+ 696              	.LVL109:
+ 697 02a8 15E0     		b	.L40
+ 698              	.LVL110:
+ 699              	.L54:
+ 700 02aa 059B     		ldr	r3, [sp, #20]
+ 701 02ac 0493     		str	r3, [sp, #16]
+ 702              	.LVL111:
+ 703 02ae B046     		mov	r8, r6
+ 704              	.LVL112:
+ 705 02b0 11E0     		b	.L40
+ 706              	.L67:
+ 707 02b2 00BF     		.align	2
+ 708              	.L66:
+ 709 02b4 00000000 		.word	sensor_isr_handler
+ 710 02b8 00000000 		.word	.LC0
+ 711 02bc 00007F43 		.word	1132396544
+ 712 02c0 0046C323 		.word	600000000
+ 713 02c4 08000000 		.word	.LC1
+ 714 02c8 20000000 		.word	.LC2
+ 715 02cc CDCC4C3E 		.word	1045220557
+ 716              	.LVL113:
+ 717              	.L55:
+ 245:main.c        ****                 }
+ 718              		.loc 1 245 0 is_stmt 1
+ 719 02d0 0123     		movs	r3, #1
+ 720              	.LVL114:
+ 721 02d2 0493     		str	r3, [sp, #16]
+ 722              	.LVL115:
+ 244:main.c        ****                     right = 1;
+ 723              		.loc 1 244 0
+ 724 02d4 9846     		mov	r8, r3
+ 725              	.LVL116:
+ 726              	.L40:
+ 248:main.c        ****                     left = 1;
+ 727              		.loc 1 248 0
+ 728 02d6 B8F1020F 		cmp	r8, #2
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 22
+
+
+ 729 02da 05D1     		bne	.L41
+ 248:main.c        ****                     left = 1;
+ 730              		.loc 1 248 0 is_stmt 0 discriminator 1
+ 731 02dc 049B     		ldr	r3, [sp, #16]
+ 732 02de 022B     		cmp	r3, #2
+ 733 02e0 02D1     		bne	.L41
+ 250:main.c        ****                 }
+ 734              		.loc 1 250 0 is_stmt 1
+ 735 02e2 0123     		movs	r3, #1
+ 736 02e4 0493     		str	r3, [sp, #16]
+ 737              	.LVL117:
+ 249:main.c        ****                     right = 1;
+ 738              		.loc 1 249 0
+ 739 02e6 9846     		mov	r8, r3
+ 740              	.LVL118:
+ 741              	.L41:
+ 262:main.c        ****                 rightControl = getPIDValue(rightControl, (left == 0 || (right == left) ? 1 : 0), &i
+ 742              		.loc 1 262 0
+ 743 02e8 049B     		ldr	r3, [sp, #16]
+ 744 02ea 1BB1     		cbz	r3, .L57
+ 262:main.c        ****                 rightControl = getPIDValue(rightControl, (left == 0 || (right == left) ? 1 : 0), &i
+ 745              		.loc 1 262 0 is_stmt 0 discriminator 2
+ 746 02ec 9845     		cmp	r8, r3
+ 747 02ee 03D1     		bne	.L58
+ 262:main.c        ****                 rightControl = getPIDValue(rightControl, (left == 0 || (right == left) ? 1 : 0), &i
+ 748              		.loc 1 262 0
+ 749 02f0 0120     		movs	r0, #1
+ 750 02f2 02E0     		b	.L42
+ 751              	.L57:
+ 752 02f4 0120     		movs	r0, #1
+ 753 02f6 00E0     		b	.L42
+ 754              	.L58:
+ 755 02f8 0020     		movs	r0, #0
+ 756              	.L42:
+ 262:main.c        ****                 rightControl = getPIDValue(rightControl, (left == 0 || (right == left) ? 1 : 0), &i
+ 757              		.loc 1 262 0 discriminator 6
+ 758 02fa FFF7FEFF 		bl	__aeabi_i2f
+ 759              	.LVL119:
+ 760 02fe 10AB     		add	r3, sp, #64
+ 761 0300 0EAA     		add	r2, sp, #56
+ 762 0302 0146     		mov	r1, r0
+ 763 0304 0698     		ldr	r0, [sp, #24]	@ float
+ 764 0306 FFF7FEFF 		bl	getPIDValue
+ 765              	.LVL120:
+ 766 030a 0690     		str	r0, [sp, #24]	@ float
+ 767              	.LVL121:
+ 263:main.c        ****                 
+ 768              		.loc 1 263 0 is_stmt 1 discriminator 6
+ 769 030c B8F1000F 		cmp	r8, #0
+ 770 0310 04D0     		beq	.L59
+ 263:main.c        ****                 
+ 771              		.loc 1 263 0 is_stmt 0 discriminator 2
+ 772 0312 049B     		ldr	r3, [sp, #16]
+ 773 0314 9845     		cmp	r8, r3
+ 774 0316 03D1     		bne	.L60
+ 263:main.c        ****                 
+ 775              		.loc 1 263 0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 23
+
+
+ 776 0318 0120     		movs	r0, #1
+ 777              	.LVL122:
+ 778 031a 02E0     		b	.L43
+ 779              	.LVL123:
+ 780              	.L59:
+ 781 031c 0120     		movs	r0, #1
+ 782              	.LVL124:
+ 783 031e 00E0     		b	.L43
+ 784              	.LVL125:
+ 785              	.L60:
+ 786 0320 0020     		movs	r0, #0
+ 787              	.LVL126:
+ 788              	.L43:
+ 263:main.c        ****                 
+ 789              		.loc 1 263 0 discriminator 6
+ 790 0322 FFF7FEFF 		bl	__aeabi_i2f
+ 791              	.LVL127:
+ 792 0326 11AB     		add	r3, sp, #68
+ 793 0328 0FAA     		add	r2, sp, #60
+ 794 032a 0146     		mov	r1, r0
+ 795 032c 0798     		ldr	r0, [sp, #28]	@ float
+ 796 032e FFF7FEFF 		bl	getPIDValue
+ 797              	.LVL128:
+ 798 0332 0790     		str	r0, [sp, #28]	@ float
+ 799              	.LVL129:
+ 265:main.c        ****                 rightSpeed = rightControl * speed;
+ 800              		.loc 1 265 0 is_stmt 1 discriminator 6
+ 801 0334 0699     		ldr	r1, [sp, #24]	@ float
+ 802 0336 0A9E     		ldr	r6, [sp, #40]	@ float
+ 803 0338 3046     		mov	r0, r6
+ 804              	.LVL130:
+ 805 033a FFF7FEFF 		bl	__aeabi_fmul
+ 806              	.LVL131:
+ 807 033e 0590     		str	r0, [sp, #20]	@ float
+ 808              	.LVL132:
+ 266:main.c        ****                
+ 809              		.loc 1 266 0 discriminator 6
+ 810 0340 0799     		ldr	r1, [sp, #28]	@ float
+ 811 0342 3046     		mov	r0, r6
+ 812              	.LVL133:
+ 813 0344 FFF7FEFF 		bl	__aeabi_fmul
+ 814              	.LVL134:
+ 815 0348 0646     		mov	r6, r0
+ 816              	.LVL135:
+ 268:main.c        ****                     rightSpeed = 0;
+ 817              		.loc 1 268 0 discriminator 6
+ 818 034a B8F1020F 		cmp	r8, #2
+ 819 034e 02D1     		bne	.L44
+ 270:main.c        ****                 }
+ 820              		.loc 1 270 0
+ 821 0350 0A9B     		ldr	r3, [sp, #40]	@ float
+ 822 0352 0593     		str	r3, [sp, #20]	@ float
+ 823              	.LVL136:
+ 269:main.c        ****                     leftSpeed = speed;
+ 824              		.loc 1 269 0
+ 825 0354 0026     		movs	r6, #0
+ 826              	.L44:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 24
+
+
+ 827              	.LVL137:
+ 273:main.c        ****                     leftSpeed = 0;
+ 828              		.loc 1 273 0
+ 829 0356 049B     		ldr	r3, [sp, #16]
+ 830 0358 022B     		cmp	r3, #2
+ 831 035a 02D1     		bne	.L45
+ 275:main.c        ****                 }
+ 832              		.loc 1 275 0
+ 833 035c 0A9E     		ldr	r6, [sp, #40]	@ float
+ 834              	.LVL138:
+ 274:main.c        ****                     rightSpeed = speed;
+ 835              		.loc 1 274 0
+ 836 035e 0023     		movs	r3, #0
+ 837 0360 0593     		str	r3, [sp, #20]	@ float
+ 838              	.LVL139:
+ 839              	.L45:
+ 294:main.c        ****                 
+ 840              		.loc 1 294 0
+ 841 0362 0598     		ldr	r0, [sp, #20]	@ float
+ 842 0364 FFF7FEFF 		bl	__aeabi_f2d
+ 843              	.LVL140:
+ 844 0368 CDE90801 		strd	r0, [sp, #32]
+ 845 036c 3046     		mov	r0, r6
+ 846 036e FFF7FEFF 		bl	__aeabi_f2d
+ 847              	.LVL141:
+ 848 0372 CDE90001 		strd	r0, [sp]
+ 849 0376 DDE90823 		ldrd	r2, [sp, #32]
+ 850 037a 1248     		ldr	r0, .L68
+ 851 037c FFF7FEFF 		bl	printf
+ 852              	.LVL142:
+ 301:main.c        ****                 
+ 853              		.loc 1 301 0
+ 854 0380 3046     		mov	r0, r6
+ 855 0382 FFF7FEFF 		bl	__aeabi_f2uiz
+ 856              	.LVL143:
+ 857 0386 C6B2     		uxtb	r6, r0
+ 858              	.LVL144:
+ 859 0388 0598     		ldr	r0, [sp, #20]	@ float
+ 860 038a FFF7FEFF 		bl	__aeabi_f2uiz
+ 861              	.LVL145:
+ 862 038e 0A22     		movs	r2, #10
+ 863 0390 3146     		mov	r1, r6
+ 864 0392 C0B2     		uxtb	r0, r0
+ 865 0394 FFF7FEFF 		bl	motor_turn
+ 866              	.LVL146:
+ 303:main.c        ****                 if (stopCount > 1) state++;
+ 867              		.loc 1 303 0
+ 868 0398 77B9     		cbnz	r7, .L32
+ 303:main.c        ****                 if (stopCount > 1) state++;
+ 869              		.loc 1 303 0 is_stmt 0 discriminator 1
+ 870 039a 0AF1010A 		add	r10, r10, #1
+ 871              	.LVL147:
+ 872 039e 0BE0     		b	.L32
+ 873              	.LVL148:
+ 874              	.L25:
+ 309:main.c        ****                 if (buttonValue == 0) {
+ 875              		.loc 1 309 0 is_stmt 1
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 25
+
+
+ 876 03a0 0A21     		movs	r1, #10
+ 877 03a2 0020     		movs	r0, #0
+ 878              	.LVL149:
+ 879 03a4 FFF7FEFF 		bl	motor_forward
+ 880              	.LVL150:
+ 310:main.c        ****                     speed += 25;
+ 881              		.loc 1 310 0
+ 882 03a8 37B9     		cbnz	r7, .L32
+ 311:main.c        ****                     state--;
+ 883              		.loc 1 311 0
+ 884 03aa 0749     		ldr	r1, .L68+4
+ 885 03ac 0A98     		ldr	r0, [sp, #40]	@ float
+ 886 03ae FFF7FEFF 		bl	__aeabi_fadd
+ 887              	.LVL151:
+ 888 03b2 0A90     		str	r0, [sp, #40]	@ float
+ 889              	.LVL152:
+ 312:main.c        ****                 }
+ 890              		.loc 1 312 0
+ 891 03b4 0AF1FF3A 		add	r10, r10, #-1
+ 892              	.LVL153:
+ 893              	.L32:
+ 894              	.LBE3:
+ 323:main.c        ****         loopTime++;
+ 895              		.loc 1 323 0
+ 896 03b8 0A20     		movs	r0, #10
+ 897 03ba FFF7FEFF 		bl	CyDelay
+ 898              	.LVL154:
+ 324:main.c        ****     }
+ 899              		.loc 1 324 0
+ 900 03be 0134     		adds	r4, r4, #1
+ 901              	.LVL155:
+ 902 03c0 56E6     		b	.L15
+ 903              	.L69:
+ 904 03c2 00BF     		.align	2
+ 905              	.L68:
+ 906 03c4 34000000 		.word	.LC3
+ 907 03c8 0000C841 		.word	1103626240
+ 908              	.LBE2:
+ 909              		.cfi_endproc
+ 910              	.LFE64:
+ 911              		.size	main, .-main
+ 912              		.section	.text._write,"ax",%progbits
+ 913              		.align	2
+ 914              		.global	_write
+ 915              		.thumb
+ 916              		.thumb_func
+ 917              		.type	_write, %function
+ 918              	_write:
+ 919              	.LFB67:
+ 360:main.c        **** 
+ 361:main.c        **** /*//ultra sonic sensor//
+ 362:main.c        **** int main()
+ 363:main.c        **** {
+ 364:main.c        ****     CyGlobalIntEnable; 
+ 365:main.c        ****     UART_1_Start();
+ 366:main.c        ****     Ultra_Start();                          // Ultra Sonic Start function
+ 367:main.c        ****     while(1) {
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 26
+
+
+ 368:main.c        ****         //If you want to print out the value  
+ 369:main.c        ****         printf("distance = %5.0f\r\n", Ultra_GetDistance());
+ 370:main.c        ****         CyDelay(1000);
+ 371:main.c        ****     }
+ 372:main.c        **** }   
+ 373:main.c        **** //*/
+ 374:main.c        **** 
+ 375:main.c        **** 
+ 376:main.c        **** /*//nunchuk//
+ 377:main.c        **** int main()
+ 378:main.c        **** {
+ 379:main.c        ****     CyGlobalIntEnable; 
+ 380:main.c        ****     UART_1_Start();
+ 381:main.c        ****   
+ 382:main.c        ****     nunchuk_start();
+ 383:main.c        ****     nunchuk_init();
+ 384:main.c        ****     
+ 385:main.c        ****     for(;;)
+ 386:main.c        ****     {    
+ 387:main.c        ****         nunchuk_read();
+ 388:main.c        ****     }
+ 389:main.c        **** }   
+ 390:main.c        **** //*/
+ 391:main.c        **** 
+ 392:main.c        **** 
+ 393:main.c        **** /*//IR receiver//
+ 394:main.c        **** int main()
+ 395:main.c        **** {
+ 396:main.c        ****     CyGlobalIntEnable; 
+ 397:main.c        ****     UART_1_Start();
+ 398:main.c        ****     
+ 399:main.c        ****     unsigned int IR_val; 
+ 400:main.c        ****     
+ 401:main.c        ****     for(;;)
+ 402:main.c        ****     {
+ 403:main.c        ****        IR_val = get_IR();
+ 404:main.c        ****        printf("%x\r\n\n",IR_val);
+ 405:main.c        ****     }    
+ 406:main.c        ****  }   
+ 407:main.c        **** //*/
+ 408:main.c        **** 
+ 409:main.c        **** 
+ 410:main.c        **** /*//Ambient light sensor//
+ 411:main.c        **** int main()
+ 412:main.c        **** {
+ 413:main.c        ****     CyGlobalIntEnable; 
+ 414:main.c        ****     UART_1_Start();
+ 415:main.c        ****     
+ 416:main.c        ****     I2C_Start();
+ 417:main.c        ****     
+ 418:main.c        ****     I2C_write(0x29,0x80,0x00);          // set to power down
+ 419:main.c        ****     I2C_write(0x29,0x80,0x03);          // set to power on
+ 420:main.c        ****     
+ 421:main.c        ****     for(;;)
+ 422:main.c        ****     {    
+ 423:main.c        ****         uint8 Data0Low,Data0High,Data1Low,Data1High;
+ 424:main.c        ****         Data0Low = I2C_read(0x29,CH0_L);
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 27
+
+
+ 425:main.c        ****         Data0High = I2C_read(0x29,CH0_H);
+ 426:main.c        ****         Data1Low = I2C_read(0x29,CH1_L);
+ 427:main.c        ****         Data1High = I2C_read(0x29,CH1_H);
+ 428:main.c        ****         
+ 429:main.c        ****         uint8 CH0, CH1;
+ 430:main.c        ****         CH0 = convert_raw(Data0Low,Data0High);      // combine Data0
+ 431:main.c        ****         CH1 = convert_raw(Data1Low,Data1High);      // combine Data1
+ 432:main.c        **** 
+ 433:main.c        ****         double Ch0 = CH0;
+ 434:main.c        ****         double Ch1 = CH1;
+ 435:main.c        ****         
+ 436:main.c        ****         double data = 0;
+ 437:main.c        ****         data = getLux(Ch0,Ch1);
+ 438:main.c        ****         
+ 439:main.c        ****         // If you want to print out data
+ 440:main.c        ****         //printf("%lf\r\n",data);    
+ 441:main.c        ****     }    
+ 442:main.c        ****  }   
+ 443:main.c        **** //*/
+ 444:main.c        **** 
+ 445:main.c        **** 
+ 446:main.c        **** /*//accelerometer//
+ 447:main.c        **** int main()
+ 448:main.c        **** {
+ 449:main.c        ****     CyGlobalIntEnable; 
+ 450:main.c        ****     UART_1_Start();
+ 451:main.c        ****   
+ 452:main.c        ****     I2C_Start();
+ 453:main.c        ****   
+ 454:main.c        ****     uint8 X_L_A, X_H_A, Y_L_A, Y_H_A, Z_L_A, Z_H_A;
+ 455:main.c        ****     int16 X_AXIS_A, Y_AXIS_A, Z_AXIS_A;
+ 456:main.c        ****     
+ 457:main.c        ****     I2C_write(ACCEL_MAG_ADDR, ACCEL_CTRL1_REG, 0x37);           // set accelerometer & magnetometer
+ 458:main.c        ****     I2C_write(ACCEL_MAG_ADDR, ACCEL_CTRL7_REG, 0x22);
+ 459:main.c        ****     
+ 460:main.c        ****     
+ 461:main.c        ****     for(;;)
+ 462:main.c        ****     {
+ 463:main.c        ****         //print out accelerometer output
+ 464:main.c        ****         X_L_A = I2C_read(ACCEL_MAG_ADDR, OUT_X_L_A);
+ 465:main.c        ****         X_H_A = I2C_read(ACCEL_MAG_ADDR, OUT_X_H_A);
+ 466:main.c        ****         X_AXIS_A = convert_raw(X_L_A, X_H_A);
+ 467:main.c        ****         
+ 468:main.c        ****         Y_L_A = I2C_read(ACCEL_MAG_ADDR, OUT_Y_L_A);
+ 469:main.c        ****         Y_H_A = I2C_read(ACCEL_MAG_ADDR, OUT_Y_H_A);
+ 470:main.c        ****         Y_AXIS_A = convert_raw(Y_L_A, Y_H_A);
+ 471:main.c        ****         
+ 472:main.c        ****         Z_L_A = I2C_read(ACCEL_MAG_ADDR, OUT_Z_L_A);
+ 473:main.c        ****         Z_H_A = I2C_read(ACCEL_MAG_ADDR, OUT_Z_H_A);
+ 474:main.c        ****         Z_AXIS_A = convert_raw(Z_L_A, Z_H_A);
+ 475:main.c        ****         
+ 476:main.c        ****         printf("ACCEL: %d %d %d %d %d %d \r\n", X_L_A, X_H_A, Y_L_A, Y_H_A, Z_L_A, Z_H_A);
+ 477:main.c        ****         value_convert_accel(X_AXIS_A, Y_AXIS_A, Z_AXIS_A);
+ 478:main.c        ****         printf("\n");
+ 479:main.c        ****         
+ 480:main.c        ****         CyDelay(50);
+ 481:main.c        ****     }
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 28
+
+
+ 482:main.c        **** }   
+ 483:main.c        **** //*/
+ 484:main.c        **** 
+ 485:main.c        **** 
+ 486:main.c        **** /*//reflectance//
+ 487:main.c        **** int main()
+ 488:main.c        **** {
+ 489:main.c        ****     struct sensors_ ref;
+ 490:main.c        ****     struct sensors_ dig;
+ 491:main.c        ****     CyGlobalIntEnable; 
+ 492:main.c        ****     UART_1_Start();
+ 493:main.c        ****   
+ 494:main.c        ****     sensor_isr_StartEx(sensor_isr_handler);
+ 495:main.c        ****     
+ 496:main.c        ****     reflectance_start();
+ 497:main.c        **** 
+ 498:main.c        ****     IR_led_Write(1);
+ 499:main.c        ****     for(;;)
+ 500:main.c        ****     {
+ 501:main.c        ****         reflectance_read(&ref);
+ 502:main.c        ****         printf("%d %d %d %d \r\n", ref.l3, ref.l1, ref.r1, ref.r3);       //print out each period o
+ 503:main.c        ****         reflectance_digital(&dig);      //print out 0 or 1 according to results of reflectance peri
+ 504:main.c        ****         printf("%d %d %d %d \r\n", dig.l3, dig.l1, dig.r1, dig.r3);        //print out 0 or 1 accor
+ 505:main.c        ****         
+ 506:main.c        ****         CyDelay(500);
+ 507:main.c        ****     }
+ 508:main.c        **** }   
+ 509:main.c        **** //*/
+ 510:main.c        **** 
+ 511:main.c        ****  /* //motor//
+ 512:main.c        **** int main()
+ 513:main.c        **** {
+ 514:main.c        ****     CyGlobalIntEnable; 
+ 515:main.c        ****     UART_1_Start();
+ 516:main.c        **** 
+ 517:main.c        ****     motor_start();              // motor start
+ 518:main.c        **** 
+ 519:main.c        ****     motor_forward(100,2000);     // moving forward
+ 520:main.c        ****     motor_turn(200,50,2000);     // turn
+ 521:main.c        ****     motor_turn(50,200,2000);     // turn
+ 522:main.c        ****     motor_backward(100,2000);    // movinb backward
+ 523:main.c        ****        
+ 524:main.c        ****     motor_stop();               // motor stop
+ 525:main.c        ****     
+ 526:main.c        ****     for(;;)
+ 527:main.c        ****     {
+ 528:main.c        **** 
+ 529:main.c        ****     }
+ 530:main.c        **** }
+ 531:main.c        **** //*/
+ 532:main.c        ****     
+ 533:main.c        **** 
+ 534:main.c        **** /*//gyroscope//
+ 535:main.c        **** int main()
+ 536:main.c        **** {
+ 537:main.c        ****     CyGlobalIntEnable; 
+ 538:main.c        ****     UART_1_Start();
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 29
+
+
+ 539:main.c        ****   
+ 540:main.c        ****     I2C_Start();
+ 541:main.c        ****   
+ 542:main.c        ****     uint8 X_L_G, X_H_G, Y_L_G, Y_H_G, Z_L_G, Z_H_G;
+ 543:main.c        ****     int16 X_AXIS_G, Y_AXIS_G, Z_AXIS_G;
+ 544:main.c        ****     
+ 545:main.c        ****     I2C_write(GYRO_ADDR, GYRO_CTRL1_REG, 0x0F);             // set gyroscope into active mode
+ 546:main.c        ****     I2C_write(GYRO_ADDR, GYRO_CTRL4_REG, 0x30);             // set full scale selection to 2000dps 
+ 547:main.c        ****     
+ 548:main.c        ****     for(;;)
+ 549:main.c        ****     {
+ 550:main.c        ****         //print out gyroscope output
+ 551:main.c        ****         X_L_G = I2C_read(GYRO_ADDR, OUT_X_AXIS_L);
+ 552:main.c        ****         X_H_G = I2C_read(GYRO_ADDR, OUT_X_AXIS_H);
+ 553:main.c        ****         X_AXIS_G = convert_raw(X_H_G, X_L_G);
+ 554:main.c        ****         
+ 555:main.c        ****         
+ 556:main.c        ****         Y_L_G = I2C_read(GYRO_ADDR, OUT_Y_AXIS_L);
+ 557:main.c        ****         Y_H_G = I2C_read(GYRO_ADDR, OUT_Y_AXIS_H);
+ 558:main.c        ****         Y_AXIS_G = convert_raw(Y_H_G, Y_L_G);
+ 559:main.c        ****         
+ 560:main.c        ****         
+ 561:main.c        ****         Z_L_G = I2C_read(GYRO_ADDR, OUT_Z_AXIS_L);
+ 562:main.c        ****         Z_H_G = I2C_read(GYRO_ADDR, OUT_Z_AXIS_H);
+ 563:main.c        ****         Z_AXIS_G = convert_raw(Z_H_G, Z_L_G);
+ 564:main.c        ****      
+ 565:main.c        ****         // If you want to print value
+ 566:main.c        ****         printf("%d %d %d \r\n", X_AXIS_G, Y_AXIS_G, Z_AXIS_G);
+ 567:main.c        ****         CyDelay(50);
+ 568:main.c        ****     }
+ 569:main.c        **** }   
+ 570:main.c        **** //*/
+ 571:main.c        **** 
+ 572:main.c        **** 
+ 573:main.c        **** /*//magnetometer//
+ 574:main.c        **** int main()
+ 575:main.c        **** {
+ 576:main.c        ****     CyGlobalIntEnable; 
+ 577:main.c        ****     UART_1_Start();
+ 578:main.c        ****   
+ 579:main.c        ****     I2C_Start();
+ 580:main.c        ****    
+ 581:main.c        ****     uint8 X_L_M, X_H_M, Y_L_M, Y_H_M, Z_L_M, Z_H_M;
+ 582:main.c        ****     int16 X_AXIS, Y_AXIS, Z_AXIS;
+ 583:main.c        ****     
+ 584:main.c        ****     I2C_write(GYRO_ADDR, GYRO_CTRL1_REG, 0x0F);             // set gyroscope into active mode
+ 585:main.c        ****     I2C_write(GYRO_ADDR, GYRO_CTRL4_REG, 0x30);             // set full scale selection to 2000dps
+ 586:main.c        ****     I2C_write(ACCEL_MAG_ADDR, ACCEL_CTRL1_REG, 0x37);           // set accelerometer & magnetometer
+ 587:main.c        ****     I2C_write(ACCEL_MAG_ADDR, ACCEL_CTRL7_REG, 0x22);
+ 588:main.c        ****     
+ 589:main.c        ****     
+ 590:main.c        ****     for(;;)
+ 591:main.c        ****     {
+ 592:main.c        ****         X_L_M = I2C_read(ACCEL_MAG_ADDR, OUT_X_L_M);
+ 593:main.c        ****         X_H_M = I2C_read(ACCEL_MAG_ADDR, OUT_X_H_M);
+ 594:main.c        ****         X_AXIS = convert_raw(X_L_M, X_H_M);
+ 595:main.c        ****         
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 30
+
+
+ 596:main.c        ****         Y_L_M = I2C_read(ACCEL_MAG_ADDR, OUT_Y_L_M);
+ 597:main.c        ****         Y_H_M = I2C_read(ACCEL_MAG_ADDR, OUT_Y_H_M);
+ 598:main.c        ****         Y_AXIS = convert_raw(Y_L_M, Y_H_M);
+ 599:main.c        ****         
+ 600:main.c        ****         Z_L_M = I2C_read(ACCEL_MAG_ADDR, OUT_Z_L_M);
+ 601:main.c        ****         Z_H_M = I2C_read(ACCEL_MAG_ADDR, OUT_Z_H_M);
+ 602:main.c        ****         Z_AXIS = convert_raw(Z_L_M, Z_H_M);
+ 603:main.c        ****         
+ 604:main.c        ****         heading(X_AXIS, Y_AXIS);
+ 605:main.c        ****         printf("MAGNET: %d %d %d %d %d %d \r\n", X_L_M, X_H_M, Y_L_M, Y_H_M, Z_L_M, Z_H_M);
+ 606:main.c        ****         printf("%d %d %d \r\n", X_AXIS,Y_AXIS, Z_AXIS);
+ 607:main.c        ****         CyDelay(50);      
+ 608:main.c        ****     }
+ 609:main.c        **** }   
+ 610:main.c        **** //*/
+ 611:main.c        **** 
+ 612:main.c        **** 
+ 613:main.c        **** #if 0
+ 614:main.c        **** int rread(void)
+ 615:main.c        **** {
+ 616:main.c        ****     SC0_SetDriveMode(PIN_DM_STRONG);
+ 617:main.c        ****     SC0_Write(1);
+ 618:main.c        ****     CyDelayUs(10);
+ 619:main.c        ****     SC0_SetDriveMode(PIN_DM_DIG_HIZ);
+ 620:main.c        ****     Timer_1_Start();
+ 621:main.c        ****     uint16_t start = Timer_1_ReadCounter();
+ 622:main.c        ****     uint16_t end = 0;
+ 623:main.c        ****     while(!(Timer_1_ReadStatusRegister() & Timer_1_STATUS_TC)) {
+ 624:main.c        ****         if(SC0_Read() == 0 && end == 0) {
+ 625:main.c        ****             end = Timer_1_ReadCounter();
+ 626:main.c        ****         }
+ 627:main.c        ****     }
+ 628:main.c        ****     Timer_1_Stop();
+ 629:main.c        ****     
+ 630:main.c        ****     return (start - end);
+ 631:main.c        **** }
+ 632:main.c        **** #endif
+ 633:main.c        **** 
+ 634:main.c        **** /* Don't remove the functions below */
+ 635:main.c        **** int _write(int file, char *ptr, int len)
+ 636:main.c        **** {
+ 920              		.loc 1 636 0
+ 921              		.cfi_startproc
+ 922              		@ args = 0, pretend = 0, frame = 0
+ 923              		@ frame_needed = 0, uses_anonymous_args = 0
+ 924              	.LVL156:
+ 925 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 926              		.cfi_def_cfa_offset 24
+ 927              		.cfi_offset 3, -24
+ 928              		.cfi_offset 4, -20
+ 929              		.cfi_offset 5, -16
+ 930              		.cfi_offset 6, -12
+ 931              		.cfi_offset 7, -8
+ 932              		.cfi_offset 14, -4
+ 933 0002 0C46     		mov	r4, r1
+ 934 0004 1746     		mov	r7, r2
+ 935              	.LVL157:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 31
+
+
+ 637:main.c        ****     (void)file; /* Parameter is not used, suppress unused argument warning */
+ 638:main.c        **** 	int n;
+ 639:main.c        **** 	for(n = 0; n < len; n++) {
+ 936              		.loc 1 639 0
+ 937 0006 0025     		movs	r5, #0
+ 938 0008 0BE0     		b	.L71
+ 939              	.LVL158:
+ 940              	.L73:
+ 640:main.c        ****         if(*ptr == '\n') UART_1_PutChar('\r');
+ 941              		.loc 1 640 0
+ 942 000a 2378     		ldrb	r3, [r4]	@ zero_extendqisi2
+ 943 000c 0A2B     		cmp	r3, #10
+ 944 000e 02D1     		bne	.L72
+ 945              		.loc 1 640 0 is_stmt 0 discriminator 1
+ 946 0010 0D20     		movs	r0, #13
+ 947 0012 FFF7FEFF 		bl	UART_1_PutChar
+ 948              	.LVL159:
+ 949              	.L72:
+ 641:main.c        **** 		UART_1_PutChar(*ptr++);
+ 950              		.loc 1 641 0 is_stmt 1 discriminator 2
+ 951 0016 661C     		adds	r6, r4, #1
+ 952              	.LVL160:
+ 953 0018 2078     		ldrb	r0, [r4]	@ zero_extendqisi2
+ 954 001a FFF7FEFF 		bl	UART_1_PutChar
+ 955              	.LVL161:
+ 639:main.c        ****         if(*ptr == '\n') UART_1_PutChar('\r');
+ 956              		.loc 1 639 0 discriminator 2
+ 957 001e 0135     		adds	r5, r5, #1
+ 958              	.LVL162:
+ 959              		.loc 1 641 0 discriminator 2
+ 960 0020 3446     		mov	r4, r6
+ 961              	.LVL163:
+ 962              	.L71:
+ 639:main.c        ****         if(*ptr == '\n') UART_1_PutChar('\r');
+ 963              		.loc 1 639 0 discriminator 1
+ 964 0022 BD42     		cmp	r5, r7
+ 965 0024 F1DB     		blt	.L73
+ 642:main.c        **** 	}
+ 643:main.c        **** 	return len;
+ 644:main.c        **** }
+ 966              		.loc 1 644 0
+ 967 0026 3846     		mov	r0, r7
+ 968 0028 F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 969              		.cfi_endproc
+ 970              	.LFE67:
+ 971              		.size	_write, .-_write
+ 972 002a 00BF     		.section	.text._read,"ax",%progbits
+ 973              		.align	2
+ 974              		.global	_read
+ 975              		.thumb
+ 976              		.thumb_func
+ 977              		.type	_read, %function
+ 978              	_read:
+ 979              	.LFB68:
+ 645:main.c        **** 
+ 646:main.c        **** int _read (int file, char *ptr, int count)
+ 647:main.c        **** {
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 32
+
+
+ 980              		.loc 1 647 0
+ 981              		.cfi_startproc
+ 982              		@ args = 0, pretend = 0, frame = 0
+ 983              		@ frame_needed = 0, uses_anonymous_args = 0
+ 984              	.LVL164:
+ 985 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 986              		.cfi_def_cfa_offset 24
+ 987              		.cfi_offset 3, -24
+ 988              		.cfi_offset 4, -20
+ 989              		.cfi_offset 5, -16
+ 990              		.cfi_offset 6, -12
+ 991              		.cfi_offset 7, -8
+ 992              		.cfi_offset 14, -4
+ 993 0002 0F46     		mov	r7, r1
+ 994 0004 1446     		mov	r4, r2
+ 995              	.LVL165:
+ 648:main.c        ****     int chs = 0;
+ 996              		.loc 1 648 0
+ 997 0006 0026     		movs	r6, #0
+ 649:main.c        ****     char ch;
+ 650:main.c        ****  
+ 651:main.c        ****     (void)file; /* Parameter is not used, suppress unused argument warning */
+ 652:main.c        ****     while(count > 0) {
+ 998              		.loc 1 652 0
+ 999 0008 12E0     		b	.L77
+ 1000              	.LVL166:
+ 1001              	.L80:
+ 653:main.c        ****         ch = UART_1_GetChar();
+ 1002              		.loc 1 653 0
+ 1003 000a FFF7FEFF 		bl	UART_1_GetChar
+ 1004              	.LVL167:
+ 654:main.c        ****         if(ch != 0) {
+ 1005              		.loc 1 654 0
+ 1006 000e 0546     		mov	r5, r0
+ 1007 0010 70B1     		cbz	r0, .L77
+ 655:main.c        ****             UART_1_PutChar(ch);
+ 1008              		.loc 1 655 0
+ 1009 0012 FFF7FEFF 		bl	UART_1_PutChar
+ 1010              	.LVL168:
+ 656:main.c        ****             chs++;
+ 1011              		.loc 1 656 0
+ 1012 0016 0136     		adds	r6, r6, #1
+ 1013              	.LVL169:
+ 657:main.c        ****             if(ch == '\r') {
+ 1014              		.loc 1 657 0
+ 1015 0018 0D2D     		cmp	r5, #13
+ 1016 001a 03D1     		bne	.L78
+ 1017              	.LVL170:
+ 658:main.c        ****                 ch = '\n';
+ 659:main.c        ****                 UART_1_PutChar(ch);
+ 1018              		.loc 1 659 0
+ 1019 001c 0A20     		movs	r0, #10
+ 1020 001e FFF7FEFF 		bl	UART_1_PutChar
+ 1021              	.LVL171:
+ 658:main.c        ****                 ch = '\n';
+ 1022              		.loc 1 658 0
+ 1023 0022 0A25     		movs	r5, #10
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 33
+
+
+ 1024              	.LVL172:
+ 1025              	.L78:
+ 660:main.c        ****             }
+ 661:main.c        ****             *ptr++ = ch;
+ 1026              		.loc 1 661 0
+ 1027 0024 7B1C     		adds	r3, r7, #1
+ 1028              	.LVL173:
+ 1029 0026 3D70     		strb	r5, [r7]
+ 662:main.c        ****             count--;
+ 1030              		.loc 1 662 0
+ 1031 0028 013C     		subs	r4, r4, #1
+ 1032              	.LVL174:
+ 663:main.c        ****             if(ch == '\n') break;
+ 1033              		.loc 1 663 0
+ 1034 002a 0A2D     		cmp	r5, #10
+ 1035 002c 02D0     		beq	.L79
+ 661:main.c        ****             count--;
+ 1036              		.loc 1 661 0
+ 1037 002e 1F46     		mov	r7, r3
+ 1038              	.LVL175:
+ 1039              	.L77:
+ 652:main.c        ****         ch = UART_1_GetChar();
+ 1040              		.loc 1 652 0
+ 1041 0030 002C     		cmp	r4, #0
+ 1042 0032 EADC     		bgt	.L80
+ 1043              	.LVL176:
+ 1044              	.L79:
+ 664:main.c        ****         }
+ 665:main.c        ****     }
+ 666:main.c        ****     return chs;
+ 667:main.c        **** }
+ 1045              		.loc 1 667 0
+ 1046 0034 3046     		mov	r0, r6
+ 1047 0036 F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 1048              		.cfi_endproc
+ 1049              	.LFE68:
+ 1050              		.size	_read, .-_read
+ 1051              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 1052              		.align	2
+ 1053              	.LC0:
+ 1054 0000 0A426F6F 		.ascii	"\012Boot\000"
+ 1054      7400
+ 1055 0006 0000     		.space	2
+ 1056              	.LC1:
+ 1057 0008 43616C63 		.ascii	"Calculated voltage %f\015\012\000"
+ 1057      756C6174 
+ 1057      65642076 
+ 1057      6F6C7461 
+ 1057      67652025 
+ 1058              	.LC2:
+ 1059 0020 2564202D 		.ascii	"%d - %d - %d - %d \012\000"
+ 1059      20256420 
+ 1059      2D202564 
+ 1059      202D2025 
+ 1059      64200A00 
+ 1060              	.LC3:
+ 1061 0034 25662C20 		.ascii	"%f, %f \012\000"
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 34
+
+
+ 1061      2566200A 
+ 1061      00
+ 1062              		.text
+ 1063              	.Letext0:
+ 1064              		.file 2 "c:\\program files (x86)\\cypress\\psoc creator\\4.1\\psoc creator\\import\\gnu\\arm\\5.4.
+ 1065              		.file 3 "c:\\program files (x86)\\cypress\\psoc creator\\4.1\\psoc creator\\import\\gnu\\arm\\5.4.
+ 1066              		.file 4 "Generated_Source\\PSoC5/cytypes.h"
+ 1067              		.file 5 ".\\ZumoLibrary/Reflectance.h"
+ 1068              		.file 6 "Generated_Source\\PSoC5/ADC_Battery.h"
+ 1069              		.file 7 "Generated_Source\\PSoC5/BatteryLed.h"
+ 1070              		.file 8 ".\\ZumoLibrary/Beep.h"
+ 1071              		.file 9 "c:\\program files (x86)\\cypress\\psoc creator\\4.1\\psoc creator\\import\\gnu\\arm\\5.4.
+ 1072              		.file 10 ".\\ZumoLibrary/Motor.h"
+ 1073              		.file 11 "Generated_Source\\PSoC5/SW1.h"
+ 1074              		.file 12 "Generated_Source\\PSoC5/CyLib.h"
+ 1075              		.file 13 "Generated_Source\\PSoC5/UART_1.h"
+ 1076              		.file 14 "Generated_Source\\PSoC5/sensor_isr.h"
+ 1077              		.file 15 "Generated_Source\\PSoC5/IR_led.h"
+ 1078              		.file 16 "Generated_Source\\PSoC5/core_cm3.h"
+ 1079              		.file 17 "<built-in>"
+ 1080              		.section	.debug_info,"",%progbits
+ 1081              	.Ldebug_info0:
+ 1082 0000 C4080000 		.4byte	0x8c4
+ 1083 0004 0400     		.2byte	0x4
+ 1084 0006 00000000 		.4byte	.Ldebug_abbrev0
+ 1085 000a 04       		.byte	0x4
+ 1086 000b 01       		.uleb128 0x1
+ 1087 000c B1030000 		.4byte	.LASF80
+ 1088 0010 0C       		.byte	0xc
+ 1089 0011 DE020000 		.4byte	.LASF81
+ 1090 0015 71030000 		.4byte	.LASF82
+ 1091 0019 00000000 		.4byte	.Ldebug_ranges0+0
+ 1092 001d 00000000 		.4byte	0
+ 1093 0021 00000000 		.4byte	.Ldebug_line0
+ 1094 0025 02       		.uleb128 0x2
+ 1095 0026 04       		.byte	0x4
+ 1096 0027 04       		.byte	0x4
+ 1097 0028 1D010000 		.4byte	.LASF0
+ 1098 002c 02       		.uleb128 0x2
+ 1099 002d 08       		.byte	0x8
+ 1100 002e 04       		.byte	0x4
+ 1101 002f 8E030000 		.4byte	.LASF1
+ 1102 0033 02       		.uleb128 0x2
+ 1103 0034 01       		.byte	0x1
+ 1104 0035 06       		.byte	0x6
+ 1105 0036 D1010000 		.4byte	.LASF2
+ 1106 003a 02       		.uleb128 0x2
+ 1107 003b 01       		.byte	0x1
+ 1108 003c 08       		.byte	0x8
+ 1109 003d 81010000 		.4byte	.LASF3
+ 1110 0041 02       		.uleb128 0x2
+ 1111 0042 02       		.byte	0x2
+ 1112 0043 05       		.byte	0x5
+ 1113 0044 32000000 		.4byte	.LASF4
+ 1114 0048 03       		.uleb128 0x3
+ 1115 0049 93000000 		.4byte	.LASF6
+ 1116 004d 02       		.byte	0x2
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 35
+
+
+ 1117 004e 2B       		.byte	0x2b
+ 1118 004f 53000000 		.4byte	0x53
+ 1119 0053 02       		.uleb128 0x2
+ 1120 0054 02       		.byte	0x2
+ 1121 0055 07       		.byte	0x7
+ 1122 0056 6C020000 		.4byte	.LASF5
+ 1123 005a 03       		.uleb128 0x3
+ 1124 005b 2E030000 		.4byte	.LASF7
+ 1125 005f 02       		.byte	0x2
+ 1126 0060 3F       		.byte	0x3f
+ 1127 0061 65000000 		.4byte	0x65
+ 1128 0065 02       		.uleb128 0x2
+ 1129 0066 04       		.byte	0x4
+ 1130 0067 05       		.byte	0x5
+ 1131 0068 31010000 		.4byte	.LASF8
+ 1132 006c 02       		.uleb128 0x2
+ 1133 006d 04       		.byte	0x4
+ 1134 006e 07       		.byte	0x7
+ 1135 006f E5020000 		.4byte	.LASF9
+ 1136 0073 02       		.uleb128 0x2
+ 1137 0074 08       		.byte	0x8
+ 1138 0075 05       		.byte	0x5
+ 1139 0076 23010000 		.4byte	.LASF10
+ 1140 007a 02       		.uleb128 0x2
+ 1141 007b 08       		.byte	0x8
+ 1142 007c 07       		.byte	0x7
+ 1143 007d E5010000 		.4byte	.LASF11
+ 1144 0081 04       		.uleb128 0x4
+ 1145 0082 04       		.byte	0x4
+ 1146 0083 05       		.byte	0x5
+ 1147 0084 696E7400 		.ascii	"int\000"
+ 1148 0088 02       		.uleb128 0x2
+ 1149 0089 04       		.byte	0x4
+ 1150 008a 07       		.byte	0x7
+ 1151 008b 0F020000 		.4byte	.LASF12
+ 1152 008f 03       		.uleb128 0x3
+ 1153 0090 26020000 		.4byte	.LASF13
+ 1154 0094 03       		.byte	0x3
+ 1155 0095 24       		.byte	0x24
+ 1156 0096 48000000 		.4byte	0x48
+ 1157 009a 03       		.uleb128 0x3
+ 1158 009b DD010000 		.4byte	.LASF14
+ 1159 009f 03       		.byte	0x3
+ 1160 00a0 2C       		.byte	0x2c
+ 1161 00a1 5A000000 		.4byte	0x5a
+ 1162 00a5 05       		.uleb128 0x5
+ 1163 00a6 D2000000 		.4byte	.LASF15
+ 1164 00aa 04       		.byte	0x4
+ 1165 00ab 9601     		.2byte	0x196
+ 1166 00ad 41000000 		.4byte	0x41
+ 1167 00b1 02       		.uleb128 0x2
+ 1168 00b2 01       		.byte	0x1
+ 1169 00b3 08       		.byte	0x8
+ 1170 00b4 AB020000 		.4byte	.LASF16
+ 1171 00b8 02       		.uleb128 0x2
+ 1172 00b9 08       		.byte	0x8
+ 1173 00ba 04       		.byte	0x4
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 36
+
+
+ 1174 00bb AE010000 		.4byte	.LASF17
+ 1175 00bf 02       		.uleb128 0x2
+ 1176 00c0 04       		.byte	0x4
+ 1177 00c1 07       		.byte	0x7
+ 1178 00c2 3C000000 		.4byte	.LASF18
+ 1179 00c6 06       		.uleb128 0x6
+ 1180 00c7 04       		.byte	0x4
+ 1181 00c8 B1000000 		.4byte	0xb1
+ 1182 00cc 07       		.uleb128 0x7
+ 1183 00cd C9000000 		.4byte	.LASF83
+ 1184 00d1 08       		.byte	0x8
+ 1185 00d2 05       		.byte	0x5
+ 1186 00d3 11       		.byte	0x11
+ 1187 00d4 05010000 		.4byte	0x105
+ 1188 00d8 08       		.uleb128 0x8
+ 1189 00d9 6C3300   		.ascii	"l3\000"
+ 1190 00dc 05       		.byte	0x5
+ 1191 00dd 12       		.byte	0x12
+ 1192 00de 8F000000 		.4byte	0x8f
+ 1193 00e2 00       		.byte	0
+ 1194 00e3 08       		.uleb128 0x8
+ 1195 00e4 6C3100   		.ascii	"l1\000"
+ 1196 00e7 05       		.byte	0x5
+ 1197 00e8 14       		.byte	0x14
+ 1198 00e9 8F000000 		.4byte	0x8f
+ 1199 00ed 02       		.byte	0x2
+ 1200 00ee 08       		.uleb128 0x8
+ 1201 00ef 723100   		.ascii	"r1\000"
+ 1202 00f2 05       		.byte	0x5
+ 1203 00f3 15       		.byte	0x15
+ 1204 00f4 8F000000 		.4byte	0x8f
+ 1205 00f8 04       		.byte	0x4
+ 1206 00f9 08       		.uleb128 0x8
+ 1207 00fa 723300   		.ascii	"r3\000"
+ 1208 00fd 05       		.byte	0x5
+ 1209 00fe 17       		.byte	0x17
+ 1210 00ff 8F000000 		.4byte	0x8f
+ 1211 0103 06       		.byte	0x6
+ 1212 0104 00       		.byte	0
+ 1213 0105 09       		.uleb128 0x9
+ 1214 0106 FC010000 		.4byte	.LASF84
+ 1215 010a 01       		.byte	0x1
+ 1216 010b 4901     		.2byte	0x149
+ 1217 010d 25000000 		.4byte	0x25
+ 1218 0111 00000000 		.4byte	.LFB65
+ 1219 0115 38000000 		.4byte	.LFE65-.LFB65
+ 1220 0119 01       		.uleb128 0x1
+ 1221 011a 9C       		.byte	0x9c
+ 1222 011b 55010000 		.4byte	0x155
+ 1223 011f 0A       		.uleb128 0xa
+ 1224 0120 61030000 		.4byte	.LASF23
+ 1225 0124 01       		.byte	0x1
+ 1226 0125 4B01     		.2byte	0x14b
+ 1227 0127 A5000000 		.4byte	0xa5
+ 1228 012b 00000000 		.4byte	.LLST0
+ 1229 012f 0B       		.uleb128 0xb
+ 1230 0130 06000000 		.4byte	.LVL1
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 37
+
+
+ 1231 0134 E7070000 		.4byte	0x7e7
+ 1232 0138 0C       		.uleb128 0xc
+ 1233 0139 0C000000 		.4byte	.LVL2
+ 1234 013d F2070000 		.4byte	0x7f2
+ 1235 0141 4B010000 		.4byte	0x14b
+ 1236 0145 0D       		.uleb128 0xd
+ 1237 0146 01       		.uleb128 0x1
+ 1238 0147 50       		.byte	0x50
+ 1239 0148 01       		.uleb128 0x1
+ 1240 0149 30       		.byte	0x30
+ 1241 014a 00       		.byte	0
+ 1242 014b 0B       		.uleb128 0xb
+ 1243 014c 12000000 		.4byte	.LVL3
+ 1244 0150 FD070000 		.4byte	0x7fd
+ 1245 0154 00       		.byte	0
+ 1246 0155 0E       		.uleb128 0xe
+ 1247 0156 E3000000 		.4byte	.LASF26
+ 1248 015a 01       		.byte	0x1
+ 1249 015b 5401     		.2byte	0x154
+ 1250 015d 25000000 		.4byte	0x25
+ 1251 0161 00000000 		.4byte	.LFB66
+ 1252 0165 88000000 		.4byte	.LFE66-.LFB66
+ 1253 0169 01       		.uleb128 0x1
+ 1254 016a 9C       		.byte	0x9c
+ 1255 016b 10020000 		.4byte	0x210
+ 1256 016f 0F       		.uleb128 0xf
+ 1257 0170 56020000 		.4byte	.LASF19
+ 1258 0174 01       		.byte	0x1
+ 1259 0175 5401     		.2byte	0x154
+ 1260 0177 25000000 		.4byte	0x25
+ 1261 017b 2B000000 		.4byte	.LLST1
+ 1262 017f 0F       		.uleb128 0xf
+ 1263 0180 2B000000 		.4byte	.LASF20
+ 1264 0184 01       		.byte	0x1
+ 1265 0185 5401     		.2byte	0x154
+ 1266 0187 25000000 		.4byte	0x25
+ 1267 018b 59000000 		.4byte	.LLST2
+ 1268 018f 0F       		.uleb128 0xf
+ 1269 0190 51010000 		.4byte	.LASF21
+ 1270 0194 01       		.byte	0x1
+ 1271 0195 5401     		.2byte	0x154
+ 1272 0197 10020000 		.4byte	0x210
+ 1273 019b 87000000 		.4byte	.LLST3
+ 1274 019f 0F       		.uleb128 0xf
+ 1275 01a0 1B000000 		.4byte	.LASF22
+ 1276 01a4 01       		.byte	0x1
+ 1277 01a5 5401     		.2byte	0x154
+ 1278 01a7 10020000 		.4byte	0x210
+ 1279 01ab B3000000 		.4byte	.LLST4
+ 1280 01af 10       		.uleb128 0x10
+ 1281 01b0 6B7000   		.ascii	"kp\000"
+ 1282 01b3 01       		.byte	0x1
+ 1283 01b4 5601     		.2byte	0x156
+ 1284 01b6 25000000 		.4byte	0x25
+ 1285 01ba 04       		.byte	0x4
+ 1286 01bb 6666E63E 		.4byte	0x3ee66666
+ 1287 01bf 10       		.uleb128 0x10
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 38
+
+
+ 1288 01c0 6B6900   		.ascii	"ki\000"
+ 1289 01c3 01       		.byte	0x1
+ 1290 01c4 5701     		.2byte	0x157
+ 1291 01c6 25000000 		.4byte	0x25
+ 1292 01ca 04       		.byte	0x4
+ 1293 01cb EC51383D 		.4byte	0x3d3851ec
+ 1294 01cf 10       		.uleb128 0x10
+ 1295 01d0 6B6400   		.ascii	"kd\000"
+ 1296 01d3 01       		.byte	0x1
+ 1297 01d4 5801     		.2byte	0x158
+ 1298 01d6 25000000 		.4byte	0x25
+ 1299 01da 04       		.byte	0x4
+ 1300 01db CDCC4C3E 		.4byte	0x3e4ccccd
+ 1301 01df 0A       		.uleb128 0xa
+ 1302 01e0 6B030000 		.4byte	.LASF24
+ 1303 01e4 01       		.byte	0x1
+ 1304 01e5 5A01     		.2byte	0x15a
+ 1305 01e7 25000000 		.4byte	0x25
+ 1306 01eb DF000000 		.4byte	.LLST5
+ 1307 01ef 0A       		.uleb128 0xa
+ 1308 01f0 67000000 		.4byte	.LASF25
+ 1309 01f4 01       		.byte	0x1
+ 1310 01f5 5C01     		.2byte	0x15c
+ 1311 01f7 25000000 		.4byte	0x25
+ 1312 01fb 0A010000 		.4byte	.LLST6
+ 1313 01ff 11       		.uleb128 0x11
+ 1314 0200 70776D00 		.ascii	"pwm\000"
+ 1315 0204 01       		.byte	0x1
+ 1316 0205 5E01     		.2byte	0x15e
+ 1317 0207 25000000 		.4byte	0x25
+ 1318 020b 28010000 		.4byte	.LLST7
+ 1319 020f 00       		.byte	0
+ 1320 0210 06       		.uleb128 0x6
+ 1321 0211 04       		.byte	0x4
+ 1322 0212 25000000 		.4byte	0x25
+ 1323 0216 12       		.uleb128 0x12
+ 1324 0217 81000000 		.4byte	.LASF27
+ 1325 021b 01       		.byte	0x1
+ 1326 021c 39       		.byte	0x39
+ 1327 021d 81000000 		.4byte	0x81
+ 1328 0221 00000000 		.4byte	.LFB64
+ 1329 0225 CC030000 		.4byte	.LFE64-.LFB64
+ 1330 0229 01       		.uleb128 0x1
+ 1331 022a 9C       		.byte	0x9c
+ 1332 022b AB060000 		.4byte	0x6ab
+ 1333 022f 13       		.uleb128 0x13
+ 1334 0230 70000000 		.4byte	.LASF28
+ 1335 0234 01       		.byte	0x1
+ 1336 0235 44       		.byte	0x44
+ 1337 0236 CC000000 		.4byte	0xcc
+ 1338 023a 02       		.uleb128 0x2
+ 1339 023b 91       		.byte	0x91
+ 1340 023c 50       		.sleb128 -48
+ 1341 023d 14       		.uleb128 0x14
+ 1342 023e 92020000 		.4byte	.LASF29
+ 1343 0242 01       		.byte	0x1
+ 1344 0243 45       		.byte	0x45
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 39
+
+
+ 1345 0244 25000000 		.4byte	0x25
+ 1346 0248 5C010000 		.4byte	.LLST8
+ 1347 024c 14       		.uleb128 0x14
+ 1348 024d 78000000 		.4byte	.LASF30
+ 1349 0251 01       		.byte	0x1
+ 1350 0252 46       		.byte	0x46
+ 1351 0253 81000000 		.4byte	0x81
+ 1352 0257 C9010000 		.4byte	.LLST9
+ 1353 025b 14       		.uleb128 0x14
+ 1354 025c 5E020000 		.4byte	.LASF31
+ 1355 0260 01       		.byte	0x1
+ 1356 0261 47       		.byte	0x47
+ 1357 0262 81000000 		.4byte	0x81
+ 1358 0266 03020000 		.4byte	.LLST10
+ 1359 026a 14       		.uleb128 0x14
+ 1360 026b C0000000 		.4byte	.LASF32
+ 1361 026f 01       		.byte	0x1
+ 1362 0270 48       		.byte	0x48
+ 1363 0271 81000000 		.4byte	0x81
+ 1364 0275 67020000 		.4byte	.LLST11
+ 1365 0279 14       		.uleb128 0x14
+ 1366 027a BA010000 		.4byte	.LASF33
+ 1367 027e 01       		.byte	0x1
+ 1368 027f 49       		.byte	0x49
+ 1369 0280 81000000 		.4byte	0x81
+ 1370 0284 86020000 		.4byte	.LLST12
+ 1371 0288 14       		.uleb128 0x14
+ 1372 0289 7F020000 		.4byte	.LASF34
+ 1373 028d 01       		.byte	0x1
+ 1374 028e 4A       		.byte	0x4a
+ 1375 028f 81000000 		.4byte	0x81
+ 1376 0293 A5020000 		.4byte	.LLST13
+ 1377 0297 14       		.uleb128 0x14
+ 1378 0298 4B020000 		.4byte	.LASF35
+ 1379 029c 01       		.byte	0x1
+ 1380 029d 4B       		.byte	0x4b
+ 1381 029e 25000000 		.4byte	0x25
+ 1382 02a2 C4020000 		.4byte	.LLST14
+ 1383 02a6 14       		.uleb128 0x14
+ 1384 02a7 5A010000 		.4byte	.LASF36
+ 1385 02ab 01       		.byte	0x1
+ 1386 02ac 4D       		.byte	0x4d
+ 1387 02ad 25000000 		.4byte	0x25
+ 1388 02b1 01030000 		.4byte	.LLST15
+ 1389 02b5 14       		.uleb128 0x14
+ 1390 02b6 45000000 		.4byte	.LASF37
+ 1391 02ba 01       		.byte	0x1
+ 1392 02bb 4E       		.byte	0x4e
+ 1393 02bc 25000000 		.4byte	0x25
+ 1394 02c0 6E030000 		.4byte	.LLST16
+ 1395 02c4 13       		.uleb128 0x13
+ 1396 02c5 8F010000 		.4byte	.LASF38
+ 1397 02c9 01       		.byte	0x1
+ 1398 02ca 50       		.byte	0x50
+ 1399 02cb AB060000 		.4byte	0x6ab
+ 1400 02cf 02       		.uleb128 0x2
+ 1401 02d0 91       		.byte	0x91
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 40
+
+
+ 1402 02d1 40       		.sleb128 -64
+ 1403 02d2 13       		.uleb128 0x13
+ 1404 02d3 00000000 		.4byte	.LASF39
+ 1405 02d7 01       		.byte	0x1
+ 1406 02d8 51       		.byte	0x51
+ 1407 02d9 AB060000 		.4byte	0x6ab
+ 1408 02dd 03       		.uleb128 0x3
+ 1409 02de 91       		.byte	0x91
+ 1410 02df B07F     		.sleb128 -80
+ 1411 02e1 15       		.uleb128 0x15
+ 1412 02e2 8B020000 		.4byte	.LASF85
+ 1413 02e6 01       		.byte	0x1
+ 1414 02e7 52       		.byte	0x52
+ 1415 02e8 BB060000 		.4byte	0x6bb
+ 1416 02ec 14       		.uleb128 0x14
+ 1417 02ed 3A010000 		.4byte	.LASF40
+ 1418 02f1 01       		.byte	0x1
+ 1419 02f2 54       		.byte	0x54
+ 1420 02f3 81000000 		.4byte	0x81
+ 1421 02f7 AB030000 		.4byte	.LLST17
+ 1422 02fb 14       		.uleb128 0x14
+ 1423 02fc B6000000 		.4byte	.LASF41
+ 1424 0300 01       		.byte	0x1
+ 1425 0301 55       		.byte	0x55
+ 1426 0302 81000000 		.4byte	0x81
+ 1427 0306 EB030000 		.4byte	.LLST18
+ 1428 030a 13       		.uleb128 0x13
+ 1429 030b B5020000 		.4byte	.LASF42
+ 1430 030f 01       		.byte	0x1
+ 1431 0310 57       		.byte	0x57
+ 1432 0311 25000000 		.4byte	0x25
+ 1433 0315 03       		.uleb128 0x3
+ 1434 0316 91       		.byte	0x91
+ 1435 0317 AC7F     		.sleb128 -84
+ 1436 0319 13       		.uleb128 0x13
+ 1437 031a A3000000 		.4byte	.LASF43
+ 1438 031e 01       		.byte	0x1
+ 1439 031f 58       		.byte	0x58
+ 1440 0320 25000000 		.4byte	0x25
+ 1441 0324 03       		.uleb128 0x3
+ 1442 0325 91       		.byte	0x91
+ 1443 0326 A87F     		.sleb128 -88
+ 1444 0328 13       		.uleb128 0x13
+ 1445 0329 66010000 		.4byte	.LASF44
+ 1446 032d 01       		.byte	0x1
+ 1447 032e 5A       		.byte	0x5a
+ 1448 032f 25000000 		.4byte	0x25
+ 1449 0333 03       		.uleb128 0x3
+ 1450 0334 91       		.byte	0x91
+ 1451 0335 A47F     		.sleb128 -92
+ 1452 0337 13       		.uleb128 0x13
+ 1453 0338 74010000 		.4byte	.LASF45
+ 1454 033c 01       		.byte	0x1
+ 1455 033d 5B       		.byte	0x5b
+ 1456 033e 25000000 		.4byte	0x25
+ 1457 0342 03       		.uleb128 0x3
+ 1458 0343 91       		.byte	0x91
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 41
+
+
+ 1459 0344 A07F     		.sleb128 -96
+ 1460 0346 16       		.uleb128 0x16
+ 1461 0347 8D000000 		.4byte	.LASF46
+ 1462 034b 01       		.byte	0x1
+ 1463 034c 5D       		.byte	0x5d
+ 1464 034d 81000000 		.4byte	0x81
+ 1465 0351 0A       		.byte	0xa
+ 1466 0352 14       		.uleb128 0x14
+ 1467 0353 25000000 		.4byte	.LASF47
+ 1468 0357 01       		.byte	0x1
+ 1469 0358 5F       		.byte	0x5f
+ 1470 0359 81000000 		.4byte	0x81
+ 1471 035d 33040000 		.4byte	.LLST19
+ 1472 0361 16       		.uleb128 0x16
+ 1473 0362 66020000 		.4byte	.LASF48
+ 1474 0366 01       		.byte	0x1
+ 1475 0367 60       		.byte	0x60
+ 1476 0368 81000000 		.4byte	0x81
+ 1477 036c 00       		.byte	0
+ 1478 036d 16       		.uleb128 0x16
+ 1479 036e A6020000 		.4byte	.LASF49
+ 1480 0372 01       		.byte	0x1
+ 1481 0373 61       		.byte	0x61
+ 1482 0374 81000000 		.4byte	0x81
+ 1483 0378 00       		.byte	0
+ 1484 0379 16       		.uleb128 0x16
+ 1485 037a 52000000 		.4byte	.LASF50
+ 1486 037e 01       		.byte	0x1
+ 1487 037f 62       		.byte	0x62
+ 1488 0380 81000000 		.4byte	0x81
+ 1489 0384 00       		.byte	0
+ 1490 0385 17       		.uleb128 0x17
+ 1491 0386 70000000 		.4byte	.LBB2
+ 1492 038a 5C030000 		.4byte	.LBE2-.LBB2
+ 1493 038e 2A060000 		.4byte	0x62a
+ 1494 0392 14       		.uleb128 0x14
+ 1495 0393 4A010000 		.4byte	.LASF51
+ 1496 0397 01       		.byte	0x1
+ 1497 0398 84       		.byte	0x84
+ 1498 0399 81000000 		.4byte	0x81
+ 1499 039d 52040000 		.4byte	.LLST20
+ 1500 03a1 17       		.uleb128 0x17
+ 1501 03a2 04010000 		.4byte	.LBB3
+ 1502 03a6 B4020000 		.4byte	.LBE3-.LBB3
+ 1503 03aa C9050000 		.4byte	0x5c9
+ 1504 03ae 14       		.uleb128 0x14
+ 1505 03af B0020000 		.4byte	.LASF52
+ 1506 03b3 01       		.byte	0x1
+ 1507 03b4 D8       		.byte	0xd8
+ 1508 03b5 81000000 		.4byte	0x81
+ 1509 03b9 91040000 		.4byte	.LLST21
+ 1510 03bd 14       		.uleb128 0x14
+ 1511 03be 15000000 		.4byte	.LASF53
+ 1512 03c2 01       		.byte	0x1
+ 1513 03c3 D9       		.byte	0xd9
+ 1514 03c4 81000000 		.4byte	0x81
+ 1515 03c8 BB040000 		.4byte	.LLST22
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 42
+
+
+ 1516 03cc 14       		.uleb128 0x14
+ 1517 03cd B1000000 		.4byte	.LASF54
+ 1518 03d1 01       		.byte	0x1
+ 1519 03d2 DB       		.byte	0xdb
+ 1520 03d3 25000000 		.4byte	0x25
+ 1521 03d7 1B050000 		.4byte	.LLST23
+ 1522 03db 0A       		.uleb128 0xa
+ 1523 03dc 1C020000 		.4byte	.LASF55
+ 1524 03e0 01       		.byte	0x1
+ 1525 03e1 0001     		.2byte	0x100
+ 1526 03e3 25000000 		.4byte	0x25
+ 1527 03e7 33050000 		.4byte	.LLST24
+ 1528 03eb 0A       		.uleb128 0xa
+ 1529 03ec 5C000000 		.4byte	.LASF56
+ 1530 03f0 01       		.byte	0x1
+ 1531 03f1 0101     		.2byte	0x101
+ 1532 03f3 25000000 		.4byte	0x25
+ 1533 03f7 60050000 		.4byte	.LLST25
+ 1534 03fb 0C       		.uleb128 0xc
+ 1535 03fc 14010000 		.4byte	.LVL61
+ 1536 0400 08080000 		.4byte	0x808
+ 1537 0404 0F040000 		.4byte	0x40f
+ 1538 0408 0D       		.uleb128 0xd
+ 1539 0409 01       		.uleb128 0x1
+ 1540 040a 50       		.byte	0x50
+ 1541 040b 02       		.uleb128 0x2
+ 1542 040c 79       		.byte	0x79
+ 1543 040d 00       		.sleb128 0
+ 1544 040e 00       		.byte	0
+ 1545 040f 0C       		.uleb128 0xc
+ 1546 0410 22010000 		.4byte	.LVL63
+ 1547 0414 13080000 		.4byte	0x813
+ 1548 0418 23040000 		.4byte	0x423
+ 1549 041c 0D       		.uleb128 0xd
+ 1550 041d 01       		.uleb128 0x1
+ 1551 041e 50       		.byte	0x50
+ 1552 041f 02       		.uleb128 0x2
+ 1553 0420 91       		.byte	0x91
+ 1554 0421 50       		.sleb128 -48
+ 1555 0422 00       		.byte	0
+ 1556 0423 0C       		.uleb128 0xc
+ 1557 0424 42010000 		.4byte	.LVL64
+ 1558 0428 1E080000 		.4byte	0x81e
+ 1559 042c 3C040000 		.4byte	0x43c
+ 1560 0430 0D       		.uleb128 0xd
+ 1561 0431 01       		.uleb128 0x1
+ 1562 0432 50       		.byte	0x50
+ 1563 0433 01       		.uleb128 0x1
+ 1564 0434 3A       		.byte	0x3a
+ 1565 0435 0D       		.uleb128 0xd
+ 1566 0436 01       		.uleb128 0x1
+ 1567 0437 51       		.byte	0x51
+ 1568 0438 02       		.uleb128 0x2
+ 1569 0439 08       		.byte	0x8
+ 1570 043a 64       		.byte	0x64
+ 1571 043b 00       		.byte	0
+ 1572 043c 0C       		.uleb128 0xc
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 43
+
+
+ 1573 043d 56010000 		.4byte	.LVL69
+ 1574 0441 08080000 		.4byte	0x808
+ 1575 0445 50040000 		.4byte	0x450
+ 1576 0449 0D       		.uleb128 0xd
+ 1577 044a 01       		.uleb128 0x1
+ 1578 044b 50       		.byte	0x50
+ 1579 044c 02       		.uleb128 0x2
+ 1580 044d 79       		.byte	0x79
+ 1581 044e 00       		.sleb128 0
+ 1582 044f 00       		.byte	0
+ 1583 0450 0C       		.uleb128 0xc
+ 1584 0451 64010000 		.4byte	.LVL71
+ 1585 0455 13080000 		.4byte	0x813
+ 1586 0459 64040000 		.4byte	0x464
+ 1587 045d 0D       		.uleb128 0xd
+ 1588 045e 01       		.uleb128 0x1
+ 1589 045f 50       		.byte	0x50
+ 1590 0460 02       		.uleb128 0x2
+ 1591 0461 91       		.byte	0x91
+ 1592 0462 50       		.sleb128 -48
+ 1593 0463 00       		.byte	0
+ 1594 0464 0C       		.uleb128 0xc
+ 1595 0465 84010000 		.4byte	.LVL72
+ 1596 0469 1E080000 		.4byte	0x81e
+ 1597 046d 7D040000 		.4byte	0x47d
+ 1598 0471 0D       		.uleb128 0xd
+ 1599 0472 01       		.uleb128 0x1
+ 1600 0473 50       		.byte	0x50
+ 1601 0474 01       		.uleb128 0x1
+ 1602 0475 3A       		.byte	0x3a
+ 1603 0476 0D       		.uleb128 0xd
+ 1604 0477 01       		.uleb128 0x1
+ 1605 0478 51       		.byte	0x51
+ 1606 0479 02       		.uleb128 0x2
+ 1607 047a 09       		.byte	0x9
+ 1608 047b C8       		.byte	0xc8
+ 1609 047c 00       		.byte	0
+ 1610 047d 0C       		.uleb128 0xc
+ 1611 047e 9C010000 		.4byte	.LVL76
+ 1612 0482 29080000 		.4byte	0x829
+ 1613 0486 AE040000 		.4byte	0x4ae
+ 1614 048a 0D       		.uleb128 0xd
+ 1615 048b 01       		.uleb128 0x1
+ 1616 048c 50       		.byte	0x50
+ 1617 048d 02       		.uleb128 0x2
+ 1618 048e 76       		.byte	0x76
+ 1619 048f 00       		.sleb128 0
+ 1620 0490 0D       		.uleb128 0xd
+ 1621 0491 01       		.uleb128 0x1
+ 1622 0492 51       		.byte	0x51
+ 1623 0493 03       		.uleb128 0x3
+ 1624 0494 91       		.byte	0x91
+ 1625 0495 40       		.sleb128 -64
+ 1626 0496 06       		.byte	0x6
+ 1627 0497 0D       		.uleb128 0xd
+ 1628 0498 01       		.uleb128 0x1
+ 1629 0499 52       		.byte	0x52
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 44
+
+
+ 1630 049a 03       		.uleb128 0x3
+ 1631 049b 91       		.byte	0x91
+ 1632 049c 44       		.sleb128 -60
+ 1633 049d 06       		.byte	0x6
+ 1634 049e 0D       		.uleb128 0xd
+ 1635 049f 01       		.uleb128 0x1
+ 1636 04a0 53       		.byte	0x53
+ 1637 04a1 03       		.uleb128 0x3
+ 1638 04a2 91       		.byte	0x91
+ 1639 04a3 48       		.sleb128 -56
+ 1640 04a4 06       		.byte	0x6
+ 1641 04a5 0D       		.uleb128 0xd
+ 1642 04a6 02       		.uleb128 0x2
+ 1643 04a7 7D       		.byte	0x7d
+ 1644 04a8 00       		.sleb128 0
+ 1645 04a9 03       		.uleb128 0x3
+ 1646 04aa 91       		.byte	0x91
+ 1647 04ab 4C       		.sleb128 -52
+ 1648 04ac 06       		.byte	0x6
+ 1649 04ad 00       		.byte	0
+ 1650 04ae 0C       		.uleb128 0xc
+ 1651 04af AC010000 		.4byte	.LVL77
+ 1652 04b3 29080000 		.4byte	0x829
+ 1653 04b7 E3040000 		.4byte	0x4e3
+ 1654 04bb 0D       		.uleb128 0xd
+ 1655 04bc 01       		.uleb128 0x1
+ 1656 04bd 50       		.byte	0x50
+ 1657 04be 02       		.uleb128 0x2
+ 1658 04bf 76       		.byte	0x76
+ 1659 04c0 00       		.sleb128 0
+ 1660 04c1 0D       		.uleb128 0xd
+ 1661 04c2 01       		.uleb128 0x1
+ 1662 04c3 51       		.byte	0x51
+ 1663 04c4 04       		.uleb128 0x4
+ 1664 04c5 91       		.byte	0x91
+ 1665 04c6 B07F     		.sleb128 -80
+ 1666 04c8 06       		.byte	0x6
+ 1667 04c9 0D       		.uleb128 0xd
+ 1668 04ca 01       		.uleb128 0x1
+ 1669 04cb 52       		.byte	0x52
+ 1670 04cc 04       		.uleb128 0x4
+ 1671 04cd 91       		.byte	0x91
+ 1672 04ce B47F     		.sleb128 -76
+ 1673 04d0 06       		.byte	0x6
+ 1674 04d1 0D       		.uleb128 0xd
+ 1675 04d2 01       		.uleb128 0x1
+ 1676 04d3 53       		.byte	0x53
+ 1677 04d4 04       		.uleb128 0x4
+ 1678 04d5 91       		.byte	0x91
+ 1679 04d6 B87F     		.sleb128 -72
+ 1680 04d8 06       		.byte	0x6
+ 1681 04d9 0D       		.uleb128 0xd
+ 1682 04da 02       		.uleb128 0x2
+ 1683 04db 7D       		.byte	0x7d
+ 1684 04dc 00       		.sleb128 0
+ 1685 04dd 04       		.uleb128 0x4
+ 1686 04de 91       		.byte	0x91
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 45
+
+
+ 1687 04df BC7F     		.sleb128 -68
+ 1688 04e1 06       		.byte	0x6
+ 1689 04e2 00       		.byte	0
+ 1690 04e3 0C       		.uleb128 0xc
+ 1691 04e4 B4010000 		.4byte	.LVL78
+ 1692 04e8 1E080000 		.4byte	0x81e
+ 1693 04ec FC040000 		.4byte	0x4fc
+ 1694 04f0 0D       		.uleb128 0xd
+ 1695 04f1 01       		.uleb128 0x1
+ 1696 04f2 50       		.byte	0x50
+ 1697 04f3 01       		.uleb128 0x1
+ 1698 04f4 44       		.byte	0x44
+ 1699 04f5 0D       		.uleb128 0xd
+ 1700 04f6 01       		.uleb128 0x1
+ 1701 04f7 51       		.byte	0x51
+ 1702 04f8 02       		.uleb128 0x2
+ 1703 04f9 09       		.byte	0x9
+ 1704 04fa C8       		.byte	0xc8
+ 1705 04fb 00       		.byte	0
+ 1706 04fc 0C       		.uleb128 0xc
+ 1707 04fd BC010000 		.4byte	.LVL79
+ 1708 0501 1E080000 		.4byte	0x81e
+ 1709 0505 15050000 		.4byte	0x515
+ 1710 0509 0D       		.uleb128 0xd
+ 1711 050a 01       		.uleb128 0x1
+ 1712 050b 50       		.byte	0x50
+ 1713 050c 01       		.uleb128 0x1
+ 1714 050d 3A       		.byte	0x3a
+ 1715 050e 0D       		.uleb128 0xd
+ 1716 050f 01       		.uleb128 0x1
+ 1717 0510 51       		.byte	0x51
+ 1718 0511 02       		.uleb128 0x2
+ 1719 0512 08       		.byte	0x8
+ 1720 0513 64       		.byte	0x64
+ 1721 0514 00       		.byte	0
+ 1722 0515 0C       		.uleb128 0xc
+ 1723 0516 C8010000 		.4byte	.LVL83
+ 1724 051a 13080000 		.4byte	0x813
+ 1725 051e 29050000 		.4byte	0x529
+ 1726 0522 0D       		.uleb128 0xd
+ 1727 0523 01       		.uleb128 0x1
+ 1728 0524 50       		.byte	0x50
+ 1729 0525 02       		.uleb128 0x2
+ 1730 0526 91       		.byte	0x91
+ 1731 0527 50       		.sleb128 -48
+ 1732 0528 00       		.byte	0
+ 1733 0529 0C       		.uleb128 0xc
+ 1734 052a 0A030000 		.4byte	.LVL120
+ 1735 052e 55010000 		.4byte	0x155
+ 1736 0532 4F050000 		.4byte	0x54f
+ 1737 0536 0D       		.uleb128 0xd
+ 1738 0537 01       		.uleb128 0x1
+ 1739 0538 50       		.byte	0x50
+ 1740 0539 06       		.uleb128 0x6
+ 1741 053a 91       		.byte	0x91
+ 1742 053b 807F     		.sleb128 -128
+ 1743 053d F6       		.byte	0xf6
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 46
+
+
+ 1744 053e 04       		.byte	0x4
+ 1745 053f 25       		.uleb128 0x25
+ 1746 0540 0D       		.uleb128 0xd
+ 1747 0541 01       		.uleb128 0x1
+ 1748 0542 52       		.byte	0x52
+ 1749 0543 03       		.uleb128 0x3
+ 1750 0544 91       		.byte	0x91
+ 1751 0545 A07F     		.sleb128 -96
+ 1752 0547 0D       		.uleb128 0xd
+ 1753 0548 01       		.uleb128 0x1
+ 1754 0549 53       		.byte	0x53
+ 1755 054a 03       		.uleb128 0x3
+ 1756 054b 91       		.byte	0x91
+ 1757 054c A87F     		.sleb128 -88
+ 1758 054e 00       		.byte	0
+ 1759 054f 0C       		.uleb128 0xc
+ 1760 0550 32030000 		.4byte	.LVL128
+ 1761 0554 55010000 		.4byte	0x155
+ 1762 0558 75050000 		.4byte	0x575
+ 1763 055c 0D       		.uleb128 0xd
+ 1764 055d 01       		.uleb128 0x1
+ 1765 055e 50       		.byte	0x50
+ 1766 055f 06       		.uleb128 0x6
+ 1767 0560 91       		.byte	0x91
+ 1768 0561 847F     		.sleb128 -124
+ 1769 0563 F6       		.byte	0xf6
+ 1770 0564 04       		.byte	0x4
+ 1771 0565 25       		.uleb128 0x25
+ 1772 0566 0D       		.uleb128 0xd
+ 1773 0567 01       		.uleb128 0x1
+ 1774 0568 52       		.byte	0x52
+ 1775 0569 03       		.uleb128 0x3
+ 1776 056a 91       		.byte	0x91
+ 1777 056b A47F     		.sleb128 -92
+ 1778 056d 0D       		.uleb128 0xd
+ 1779 056e 01       		.uleb128 0x1
+ 1780 056f 53       		.byte	0x53
+ 1781 0570 03       		.uleb128 0x3
+ 1782 0571 91       		.byte	0x91
+ 1783 0572 AC7F     		.sleb128 -84
+ 1784 0574 00       		.byte	0
+ 1785 0575 0C       		.uleb128 0xc
+ 1786 0576 80030000 		.4byte	.LVL142
+ 1787 057a 29080000 		.4byte	0x829
+ 1788 057e 9B050000 		.4byte	0x59b
+ 1789 0582 0D       		.uleb128 0xd
+ 1790 0583 01       		.uleb128 0x1
+ 1791 0584 50       		.byte	0x50
+ 1792 0585 05       		.uleb128 0x5
+ 1793 0586 03       		.byte	0x3
+ 1794 0587 34000000 		.4byte	.LC3
+ 1795 058b 0D       		.uleb128 0xd
+ 1796 058c 06       		.uleb128 0x6
+ 1797 058d 52       		.byte	0x52
+ 1798 058e 93       		.byte	0x93
+ 1799 058f 04       		.uleb128 0x4
+ 1800 0590 53       		.byte	0x53
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 47
+
+
+ 1801 0591 93       		.byte	0x93
+ 1802 0592 04       		.uleb128 0x4
+ 1803 0593 06       		.uleb128 0x6
+ 1804 0594 91       		.byte	0x91
+ 1805 0595 887F     		.sleb128 -120
+ 1806 0597 F6       		.byte	0xf6
+ 1807 0598 08       		.byte	0x8
+ 1808 0599 2C       		.uleb128 0x2c
+ 1809 059a 00       		.byte	0
+ 1810 059b 0C       		.uleb128 0xc
+ 1811 059c 98030000 		.4byte	.LVL146
+ 1812 05a0 34080000 		.4byte	0x834
+ 1813 05a4 B4050000 		.4byte	0x5b4
+ 1814 05a8 0D       		.uleb128 0xd
+ 1815 05a9 01       		.uleb128 0x1
+ 1816 05aa 51       		.byte	0x51
+ 1817 05ab 02       		.uleb128 0x2
+ 1818 05ac 76       		.byte	0x76
+ 1819 05ad 00       		.sleb128 0
+ 1820 05ae 0D       		.uleb128 0xd
+ 1821 05af 01       		.uleb128 0x1
+ 1822 05b0 52       		.byte	0x52
+ 1823 05b1 01       		.uleb128 0x1
+ 1824 05b2 3A       		.byte	0x3a
+ 1825 05b3 00       		.byte	0
+ 1826 05b4 18       		.uleb128 0x18
+ 1827 05b5 A8030000 		.4byte	.LVL150
+ 1828 05b9 3F080000 		.4byte	0x83f
+ 1829 05bd 0D       		.uleb128 0xd
+ 1830 05be 01       		.uleb128 0x1
+ 1831 05bf 50       		.byte	0x50
+ 1832 05c0 01       		.uleb128 0x1
+ 1833 05c1 30       		.byte	0x30
+ 1834 05c2 0D       		.uleb128 0xd
+ 1835 05c3 01       		.uleb128 0x1
+ 1836 05c4 51       		.byte	0x51
+ 1837 05c5 01       		.uleb128 0x1
+ 1838 05c6 3A       		.byte	0x3a
+ 1839 05c7 00       		.byte	0
+ 1840 05c8 00       		.byte	0
+ 1841 05c9 0B       		.uleb128 0xb
+ 1842 05ca 7E000000 		.4byte	.LVL44
+ 1843 05ce 05010000 		.4byte	0x105
+ 1844 05d2 0C       		.uleb128 0xc
+ 1845 05d3 8E000000 		.4byte	.LVL47
+ 1846 05d7 29080000 		.4byte	0x829
+ 1847 05db E9050000 		.4byte	0x5e9
+ 1848 05df 0D       		.uleb128 0xd
+ 1849 05e0 01       		.uleb128 0x1
+ 1850 05e1 50       		.byte	0x50
+ 1851 05e2 05       		.uleb128 0x5
+ 1852 05e3 03       		.byte	0x3
+ 1853 05e4 08000000 		.4byte	.LC1
+ 1854 05e8 00       		.byte	0
+ 1855 05e9 0C       		.uleb128 0xc
+ 1856 05ea B8000000 		.4byte	.LVL52
+ 1857 05ee 08080000 		.4byte	0x808
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 48
+
+
+ 1858 05f2 FD050000 		.4byte	0x5fd
+ 1859 05f6 0D       		.uleb128 0xd
+ 1860 05f7 01       		.uleb128 0x1
+ 1861 05f8 50       		.byte	0x50
+ 1862 05f9 02       		.uleb128 0x2
+ 1863 05fa 79       		.byte	0x79
+ 1864 05fb 00       		.sleb128 0
+ 1865 05fc 00       		.byte	0
+ 1866 05fd 0C       		.uleb128 0xc
+ 1867 05fe CC000000 		.4byte	.LVL55
+ 1868 0602 08080000 		.4byte	0x808
+ 1869 0606 11060000 		.4byte	0x611
+ 1870 060a 0D       		.uleb128 0xd
+ 1871 060b 01       		.uleb128 0x1
+ 1872 060c 50       		.byte	0x50
+ 1873 060d 02       		.uleb128 0x2
+ 1874 060e 79       		.byte	0x79
+ 1875 060f 00       		.sleb128 0
+ 1876 0610 00       		.byte	0
+ 1877 0611 0B       		.uleb128 0xb
+ 1878 0612 D0000000 		.4byte	.LVL56
+ 1879 0616 4A080000 		.4byte	0x84a
+ 1880 061a 18       		.uleb128 0x18
+ 1881 061b BE030000 		.4byte	.LVL154
+ 1882 061f 55080000 		.4byte	0x855
+ 1883 0623 0D       		.uleb128 0xd
+ 1884 0624 01       		.uleb128 0x1
+ 1885 0625 50       		.byte	0x50
+ 1886 0626 01       		.uleb128 0x1
+ 1887 0627 3A       		.byte	0x3a
+ 1888 0628 00       		.byte	0
+ 1889 0629 00       		.byte	0
+ 1890 062a 0B       		.uleb128 0xb
+ 1891 062b 0C000000 		.4byte	.LVL31
+ 1892 062f 60080000 		.4byte	0x860
+ 1893 0633 0B       		.uleb128 0xb
+ 1894 0634 10000000 		.4byte	.LVL32
+ 1895 0638 6B080000 		.4byte	0x86b
+ 1896 063c 0B       		.uleb128 0xb
+ 1897 063d 16000000 		.4byte	.LVL33
+ 1898 0641 76080000 		.4byte	0x876
+ 1899 0645 0B       		.uleb128 0xb
+ 1900 0646 1A000000 		.4byte	.LVL34
+ 1901 064a 81080000 		.4byte	0x881
+ 1902 064e 0B       		.uleb128 0xb
+ 1903 064f 1E000000 		.4byte	.LVL35
+ 1904 0653 8C080000 		.4byte	0x88c
+ 1905 0657 0C       		.uleb128 0xc
+ 1906 0658 24000000 		.4byte	.LVL36
+ 1907 065c 97080000 		.4byte	0x897
+ 1908 0660 6A060000 		.4byte	0x66a
+ 1909 0664 0D       		.uleb128 0xd
+ 1910 0665 01       		.uleb128 0x1
+ 1911 0666 50       		.byte	0x50
+ 1912 0667 01       		.uleb128 0x1
+ 1913 0668 31       		.byte	0x31
+ 1914 0669 00       		.byte	0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 49
+
+
+ 1915 066a 0C       		.uleb128 0xc
+ 1916 066b 46000000 		.4byte	.LVL39
+ 1917 066f A2080000 		.4byte	0x8a2
+ 1918 0673 81060000 		.4byte	0x681
+ 1919 0677 0D       		.uleb128 0xd
+ 1920 0678 01       		.uleb128 0x1
+ 1921 0679 50       		.byte	0x50
+ 1922 067a 05       		.uleb128 0x5
+ 1923 067b 03       		.byte	0x3
+ 1924 067c 00000000 		.4byte	.LC0
+ 1925 0680 00       		.byte	0
+ 1926 0681 0C       		.uleb128 0xc
+ 1927 0682 4C000000 		.4byte	.LVL40
+ 1928 0686 08080000 		.4byte	0x808
+ 1929 068a 95060000 		.4byte	0x695
+ 1930 068e 0D       		.uleb128 0xd
+ 1931 068f 01       		.uleb128 0x1
+ 1932 0690 50       		.byte	0x50
+ 1933 0691 02       		.uleb128 0x2
+ 1934 0692 75       		.byte	0x75
+ 1935 0693 00       		.sleb128 0
+ 1936 0694 00       		.byte	0
+ 1937 0695 18       		.uleb128 0x18
+ 1938 0696 54000000 		.4byte	.LVL41
+ 1939 069a 3F080000 		.4byte	0x83f
+ 1940 069e 0D       		.uleb128 0xd
+ 1941 069f 01       		.uleb128 0x1
+ 1942 06a0 50       		.byte	0x50
+ 1943 06a1 02       		.uleb128 0x2
+ 1944 06a2 75       		.byte	0x75
+ 1945 06a3 00       		.sleb128 0
+ 1946 06a4 0D       		.uleb128 0xd
+ 1947 06a5 01       		.uleb128 0x1
+ 1948 06a6 51       		.byte	0x51
+ 1949 06a7 01       		.uleb128 0x1
+ 1950 06a8 3A       		.byte	0x3a
+ 1951 06a9 00       		.byte	0
+ 1952 06aa 00       		.byte	0
+ 1953 06ab 19       		.uleb128 0x19
+ 1954 06ac 81000000 		.4byte	0x81
+ 1955 06b0 BB060000 		.4byte	0x6bb
+ 1956 06b4 1A       		.uleb128 0x1a
+ 1957 06b5 BF000000 		.4byte	0xbf
+ 1958 06b9 03       		.byte	0x3
+ 1959 06ba 00       		.byte	0
+ 1960 06bb 19       		.uleb128 0x19
+ 1961 06bc 25000000 		.4byte	0x25
+ 1962 06c0 CB060000 		.4byte	0x6cb
+ 1963 06c4 1A       		.uleb128 0x1a
+ 1964 06c5 BF000000 		.4byte	0xbf
+ 1965 06c9 03       		.byte	0x3
+ 1966 06ca 00       		.byte	0
+ 1967 06cb 1B       		.uleb128 0x1b
+ 1968 06cc 86000000 		.4byte	.LASF57
+ 1969 06d0 01       		.byte	0x1
+ 1970 06d1 7B02     		.2byte	0x27b
+ 1971 06d3 81000000 		.4byte	0x81
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 50
+
+
+ 1972 06d7 00000000 		.4byte	.LFB67
+ 1973 06db 2A000000 		.4byte	.LFE67-.LFB67
+ 1974 06df 01       		.uleb128 0x1
+ 1975 06e0 9C       		.byte	0x9c
+ 1976 06e1 40070000 		.4byte	0x740
+ 1977 06e5 0F       		.uleb128 0xf
+ 1978 06e6 9E000000 		.4byte	.LASF58
+ 1979 06ea 01       		.byte	0x1
+ 1980 06eb 7B02     		.2byte	0x27b
+ 1981 06ed 81000000 		.4byte	0x81
+ 1982 06f1 89050000 		.4byte	.LLST26
+ 1983 06f5 1C       		.uleb128 0x1c
+ 1984 06f6 70747200 		.ascii	"ptr\000"
+ 1985 06fa 01       		.byte	0x1
+ 1986 06fb 7B02     		.2byte	0x27b
+ 1987 06fd C6000000 		.4byte	0xc6
+ 1988 0701 AA050000 		.4byte	.LLST27
+ 1989 0705 1C       		.uleb128 0x1c
+ 1990 0706 6C656E00 		.ascii	"len\000"
+ 1991 070a 01       		.byte	0x1
+ 1992 070b 7B02     		.2byte	0x27b
+ 1993 070d 81000000 		.4byte	0x81
+ 1994 0711 DE050000 		.4byte	.LLST28
+ 1995 0715 11       		.uleb128 0x11
+ 1996 0716 6E00     		.ascii	"n\000"
+ 1997 0718 01       		.byte	0x1
+ 1998 0719 7E02     		.2byte	0x27e
+ 1999 071b 81000000 		.4byte	0x81
+ 2000 071f FC050000 		.4byte	.LLST29
+ 2001 0723 0C       		.uleb128 0xc
+ 2002 0724 16000000 		.4byte	.LVL159
+ 2003 0728 B1080000 		.4byte	0x8b1
+ 2004 072c 36070000 		.4byte	0x736
+ 2005 0730 0D       		.uleb128 0xd
+ 2006 0731 01       		.uleb128 0x1
+ 2007 0732 50       		.byte	0x50
+ 2008 0733 01       		.uleb128 0x1
+ 2009 0734 3D       		.byte	0x3d
+ 2010 0735 00       		.byte	0
+ 2011 0736 0B       		.uleb128 0xb
+ 2012 0737 1E000000 		.4byte	.LVL161
+ 2013 073b B1080000 		.4byte	0x8b1
+ 2014 073f 00       		.byte	0
+ 2015 0740 1B       		.uleb128 0x1b
+ 2016 0741 CB010000 		.4byte	.LASF59
+ 2017 0745 01       		.byte	0x1
+ 2018 0746 8602     		.2byte	0x286
+ 2019 0748 81000000 		.4byte	0x81
+ 2020 074c 00000000 		.4byte	.LFB68
+ 2021 0750 38000000 		.4byte	.LFE68-.LFB68
+ 2022 0754 01       		.uleb128 0x1
+ 2023 0755 9C       		.byte	0x9c
+ 2024 0756 D6070000 		.4byte	0x7d6
+ 2025 075a 0F       		.uleb128 0xf
+ 2026 075b 9E000000 		.4byte	.LASF58
+ 2027 075f 01       		.byte	0x1
+ 2028 0760 8602     		.2byte	0x286
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 51
+
+
+ 2029 0762 81000000 		.4byte	0x81
+ 2030 0766 1B060000 		.4byte	.LLST30
+ 2031 076a 1C       		.uleb128 0x1c
+ 2032 076b 70747200 		.ascii	"ptr\000"
+ 2033 076f 01       		.byte	0x1
+ 2034 0770 8602     		.2byte	0x286
+ 2035 0772 C6000000 		.4byte	0xc6
+ 2036 0776 3C060000 		.4byte	.LLST31
+ 2037 077a 0F       		.uleb128 0xf
+ 2038 077b 16030000 		.4byte	.LASF60
+ 2039 077f 01       		.byte	0x1
+ 2040 0780 8602     		.2byte	0x286
+ 2041 0782 81000000 		.4byte	0x81
+ 2042 0786 70060000 		.4byte	.LLST32
+ 2043 078a 11       		.uleb128 0x11
+ 2044 078b 63687300 		.ascii	"chs\000"
+ 2045 078f 01       		.byte	0x1
+ 2046 0790 8802     		.2byte	0x288
+ 2047 0792 81000000 		.4byte	0x81
+ 2048 0796 8E060000 		.4byte	.LLST33
+ 2049 079a 11       		.uleb128 0x11
+ 2050 079b 636800   		.ascii	"ch\000"
+ 2051 079e 01       		.byte	0x1
+ 2052 079f 8902     		.2byte	0x289
+ 2053 07a1 B1000000 		.4byte	0xb1
+ 2054 07a5 AD060000 		.4byte	.LLST34
+ 2055 07a9 0B       		.uleb128 0xb
+ 2056 07aa 0E000000 		.4byte	.LVL167
+ 2057 07ae BC080000 		.4byte	0x8bc
+ 2058 07b2 0C       		.uleb128 0xc
+ 2059 07b3 16000000 		.4byte	.LVL168
+ 2060 07b7 B1080000 		.4byte	0x8b1
+ 2061 07bb C6070000 		.4byte	0x7c6
+ 2062 07bf 0D       		.uleb128 0xd
+ 2063 07c0 01       		.uleb128 0x1
+ 2064 07c1 50       		.byte	0x50
+ 2065 07c2 02       		.uleb128 0x2
+ 2066 07c3 75       		.byte	0x75
+ 2067 07c4 00       		.sleb128 0
+ 2068 07c5 00       		.byte	0
+ 2069 07c6 18       		.uleb128 0x18
+ 2070 07c7 22000000 		.4byte	.LVL171
+ 2071 07cb B1080000 		.4byte	0x8b1
+ 2072 07cf 0D       		.uleb128 0xd
+ 2073 07d0 01       		.uleb128 0x1
+ 2074 07d1 50       		.byte	0x50
+ 2075 07d2 01       		.uleb128 0x1
+ 2076 07d3 3A       		.byte	0x3a
+ 2077 07d4 00       		.byte	0
+ 2078 07d5 00       		.byte	0
+ 2079 07d6 1D       		.uleb128 0x1d
+ 2080 07d7 A4030000 		.4byte	.LASF86
+ 2081 07db 10       		.byte	0x10
+ 2082 07dc 9606     		.2byte	0x696
+ 2083 07de E2070000 		.4byte	0x7e2
+ 2084 07e2 1E       		.uleb128 0x1e
+ 2085 07e3 9A000000 		.4byte	0x9a
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 52
+
+
+ 2086 07e7 1F       		.uleb128 0x1f
+ 2087 07e8 95010000 		.4byte	.LASF61
+ 2088 07ec 95010000 		.4byte	.LASF61
+ 2089 07f0 06       		.byte	0x6
+ 2090 07f1 D1       		.byte	0xd1
+ 2091 07f2 1F       		.uleb128 0x1f
+ 2092 07f3 2F020000 		.4byte	.LASF62
+ 2093 07f7 2F020000 		.4byte	.LASF62
+ 2094 07fb 06       		.byte	0x6
+ 2095 07fc 39       		.byte	0x39
+ 2096 07fd 1F       		.uleb128 0x1f
+ 2097 07fe 49030000 		.4byte	.LASF63
+ 2098 0802 49030000 		.4byte	.LASF63
+ 2099 0806 06       		.byte	0x6
+ 2100 0807 3B       		.byte	0x3b
+ 2101 0808 1F       		.uleb128 0x1f
+ 2102 0809 C4020000 		.4byte	.LASF64
+ 2103 080d C4020000 		.4byte	.LASF64
+ 2104 0811 07       		.byte	0x7
+ 2105 0812 26       		.byte	0x26
+ 2106 0813 1F       		.uleb128 0x1f
+ 2107 0814 38030000 		.4byte	.LASF65
+ 2108 0818 38030000 		.4byte	.LASF65
+ 2109 081c 05       		.byte	0x5
+ 2110 081d 1B       		.byte	0x1b
+ 2111 081e 1F       		.uleb128 0x1f
+ 2112 081f C6010000 		.4byte	.LASF66
+ 2113 0823 C6010000 		.4byte	.LASF66
+ 2114 0827 08       		.byte	0x8
+ 2115 0828 04       		.byte	0x4
+ 2116 0829 1F       		.uleb128 0x1f
+ 2117 082a 43010000 		.4byte	.LASF67
+ 2118 082e 43010000 		.4byte	.LASF67
+ 2119 0832 09       		.byte	0x9
+ 2120 0833 BB       		.byte	0xbb
+ 2121 0834 1F       		.uleb128 0x1f
+ 2122 0835 D8000000 		.4byte	.LASF68
+ 2123 0839 D8000000 		.4byte	.LASF68
+ 2124 083d 0A       		.byte	0xa
+ 2125 083e 12       		.byte	0x12
+ 2126 083f 1F       		.uleb128 0x1f
+ 2127 0840 98020000 		.4byte	.LASF69
+ 2128 0844 98020000 		.4byte	.LASF69
+ 2129 0848 0A       		.byte	0xa
+ 2130 0849 0F       		.byte	0xf
+ 2131 084a 1F       		.uleb128 0x1f
+ 2132 084b D5020000 		.4byte	.LASF70
+ 2133 084f D5020000 		.4byte	.LASF70
+ 2134 0853 0B       		.byte	0xb
+ 2135 0854 29       		.byte	0x29
+ 2136 0855 1F       		.uleb128 0x1f
+ 2137 0856 3F040000 		.4byte	.LASF71
+ 2138 085a 3F040000 		.4byte	.LASF71
+ 2139 085e 0C       		.byte	0xc
+ 2140 085f 76       		.byte	0x76
+ 2141 0860 1F       		.uleb128 0x1f
+ 2142 0861 01010000 		.4byte	.LASF72
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 53
+
+
+ 2143 0865 01010000 		.4byte	.LASF72
+ 2144 0869 0D       		.byte	0xd
+ 2145 086a 54       		.byte	0x54
+ 2146 086b 1F       		.uleb128 0x1f
+ 2147 086c 1C030000 		.4byte	.LASF73
+ 2148 0870 1C030000 		.4byte	.LASF73
+ 2149 0874 06       		.byte	0x6
+ 2150 0875 34       		.byte	0x34
+ 2151 0876 1F       		.uleb128 0x1f
+ 2152 0877 F7020000 		.4byte	.LASF74
+ 2153 087b F7020000 		.4byte	.LASF74
+ 2154 087f 0E       		.byte	0xe
+ 2155 0880 18       		.byte	0x18
+ 2156 0881 1F       		.uleb128 0x1f
+ 2157 0882 EF000000 		.4byte	.LASF75
+ 2158 0886 EF000000 		.4byte	.LASF75
+ 2159 088a 05       		.byte	0x5
+ 2160 088b 1A       		.byte	0x1a
+ 2161 088c 1F       		.uleb128 0x1f
+ 2162 088d 0A030000 		.4byte	.LASF76
+ 2163 0891 0A030000 		.4byte	.LASF76
+ 2164 0895 0A       		.byte	0xa
+ 2165 0896 0B       		.byte	0xb
+ 2166 0897 1F       		.uleb128 0x1f
+ 2167 0898 47040000 		.4byte	.LASF77
+ 2168 089c 47040000 		.4byte	.LASF77
+ 2169 08a0 0F       		.byte	0xf
+ 2170 08a1 26       		.byte	0x26
+ 2171 08a2 20       		.uleb128 0x20
+ 2172 08a3 51020000 		.4byte	.LASF87
+ 2173 08a7 95030000 		.4byte	.LASF88
+ 2174 08ab 11       		.byte	0x11
+ 2175 08ac 00       		.byte	0
+ 2176 08ad 51020000 		.4byte	.LASF87
+ 2177 08b1 1F       		.uleb128 0x1f
+ 2178 08b2 0E010000 		.4byte	.LASF78
+ 2179 08b6 0E010000 		.4byte	.LASF78
+ 2180 08ba 0D       		.byte	0xd
+ 2181 08bb 8A       		.byte	0x8a
+ 2182 08bc 1F       		.uleb128 0x1f
+ 2183 08bd 06000000 		.4byte	.LASF79
+ 2184 08c1 06000000 		.4byte	.LASF79
+ 2185 08c5 0D       		.byte	0xd
+ 2186 08c6 71       		.byte	0x71
+ 2187 08c7 00       		.byte	0
+ 2188              		.section	.debug_abbrev,"",%progbits
+ 2189              	.Ldebug_abbrev0:
+ 2190 0000 01       		.uleb128 0x1
+ 2191 0001 11       		.uleb128 0x11
+ 2192 0002 01       		.byte	0x1
+ 2193 0003 25       		.uleb128 0x25
+ 2194 0004 0E       		.uleb128 0xe
+ 2195 0005 13       		.uleb128 0x13
+ 2196 0006 0B       		.uleb128 0xb
+ 2197 0007 03       		.uleb128 0x3
+ 2198 0008 0E       		.uleb128 0xe
+ 2199 0009 1B       		.uleb128 0x1b
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 54
+
+
+ 2200 000a 0E       		.uleb128 0xe
+ 2201 000b 55       		.uleb128 0x55
+ 2202 000c 17       		.uleb128 0x17
+ 2203 000d 11       		.uleb128 0x11
+ 2204 000e 01       		.uleb128 0x1
+ 2205 000f 10       		.uleb128 0x10
+ 2206 0010 17       		.uleb128 0x17
+ 2207 0011 00       		.byte	0
+ 2208 0012 00       		.byte	0
+ 2209 0013 02       		.uleb128 0x2
+ 2210 0014 24       		.uleb128 0x24
+ 2211 0015 00       		.byte	0
+ 2212 0016 0B       		.uleb128 0xb
+ 2213 0017 0B       		.uleb128 0xb
+ 2214 0018 3E       		.uleb128 0x3e
+ 2215 0019 0B       		.uleb128 0xb
+ 2216 001a 03       		.uleb128 0x3
+ 2217 001b 0E       		.uleb128 0xe
+ 2218 001c 00       		.byte	0
+ 2219 001d 00       		.byte	0
+ 2220 001e 03       		.uleb128 0x3
+ 2221 001f 16       		.uleb128 0x16
+ 2222 0020 00       		.byte	0
+ 2223 0021 03       		.uleb128 0x3
+ 2224 0022 0E       		.uleb128 0xe
+ 2225 0023 3A       		.uleb128 0x3a
+ 2226 0024 0B       		.uleb128 0xb
+ 2227 0025 3B       		.uleb128 0x3b
+ 2228 0026 0B       		.uleb128 0xb
+ 2229 0027 49       		.uleb128 0x49
+ 2230 0028 13       		.uleb128 0x13
+ 2231 0029 00       		.byte	0
+ 2232 002a 00       		.byte	0
+ 2233 002b 04       		.uleb128 0x4
+ 2234 002c 24       		.uleb128 0x24
+ 2235 002d 00       		.byte	0
+ 2236 002e 0B       		.uleb128 0xb
+ 2237 002f 0B       		.uleb128 0xb
+ 2238 0030 3E       		.uleb128 0x3e
+ 2239 0031 0B       		.uleb128 0xb
+ 2240 0032 03       		.uleb128 0x3
+ 2241 0033 08       		.uleb128 0x8
+ 2242 0034 00       		.byte	0
+ 2243 0035 00       		.byte	0
+ 2244 0036 05       		.uleb128 0x5
+ 2245 0037 16       		.uleb128 0x16
+ 2246 0038 00       		.byte	0
+ 2247 0039 03       		.uleb128 0x3
+ 2248 003a 0E       		.uleb128 0xe
+ 2249 003b 3A       		.uleb128 0x3a
+ 2250 003c 0B       		.uleb128 0xb
+ 2251 003d 3B       		.uleb128 0x3b
+ 2252 003e 05       		.uleb128 0x5
+ 2253 003f 49       		.uleb128 0x49
+ 2254 0040 13       		.uleb128 0x13
+ 2255 0041 00       		.byte	0
+ 2256 0042 00       		.byte	0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 55
+
+
+ 2257 0043 06       		.uleb128 0x6
+ 2258 0044 0F       		.uleb128 0xf
+ 2259 0045 00       		.byte	0
+ 2260 0046 0B       		.uleb128 0xb
+ 2261 0047 0B       		.uleb128 0xb
+ 2262 0048 49       		.uleb128 0x49
+ 2263 0049 13       		.uleb128 0x13
+ 2264 004a 00       		.byte	0
+ 2265 004b 00       		.byte	0
+ 2266 004c 07       		.uleb128 0x7
+ 2267 004d 13       		.uleb128 0x13
+ 2268 004e 01       		.byte	0x1
+ 2269 004f 03       		.uleb128 0x3
+ 2270 0050 0E       		.uleb128 0xe
+ 2271 0051 0B       		.uleb128 0xb
+ 2272 0052 0B       		.uleb128 0xb
+ 2273 0053 3A       		.uleb128 0x3a
+ 2274 0054 0B       		.uleb128 0xb
+ 2275 0055 3B       		.uleb128 0x3b
+ 2276 0056 0B       		.uleb128 0xb
+ 2277 0057 01       		.uleb128 0x1
+ 2278 0058 13       		.uleb128 0x13
+ 2279 0059 00       		.byte	0
+ 2280 005a 00       		.byte	0
+ 2281 005b 08       		.uleb128 0x8
+ 2282 005c 0D       		.uleb128 0xd
+ 2283 005d 00       		.byte	0
+ 2284 005e 03       		.uleb128 0x3
+ 2285 005f 08       		.uleb128 0x8
+ 2286 0060 3A       		.uleb128 0x3a
+ 2287 0061 0B       		.uleb128 0xb
+ 2288 0062 3B       		.uleb128 0x3b
+ 2289 0063 0B       		.uleb128 0xb
+ 2290 0064 49       		.uleb128 0x49
+ 2291 0065 13       		.uleb128 0x13
+ 2292 0066 38       		.uleb128 0x38
+ 2293 0067 0B       		.uleb128 0xb
+ 2294 0068 00       		.byte	0
+ 2295 0069 00       		.byte	0
+ 2296 006a 09       		.uleb128 0x9
+ 2297 006b 2E       		.uleb128 0x2e
+ 2298 006c 01       		.byte	0x1
+ 2299 006d 3F       		.uleb128 0x3f
+ 2300 006e 19       		.uleb128 0x19
+ 2301 006f 03       		.uleb128 0x3
+ 2302 0070 0E       		.uleb128 0xe
+ 2303 0071 3A       		.uleb128 0x3a
+ 2304 0072 0B       		.uleb128 0xb
+ 2305 0073 3B       		.uleb128 0x3b
+ 2306 0074 05       		.uleb128 0x5
+ 2307 0075 49       		.uleb128 0x49
+ 2308 0076 13       		.uleb128 0x13
+ 2309 0077 11       		.uleb128 0x11
+ 2310 0078 01       		.uleb128 0x1
+ 2311 0079 12       		.uleb128 0x12
+ 2312 007a 06       		.uleb128 0x6
+ 2313 007b 40       		.uleb128 0x40
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 56
+
+
+ 2314 007c 18       		.uleb128 0x18
+ 2315 007d 9642     		.uleb128 0x2116
+ 2316 007f 19       		.uleb128 0x19
+ 2317 0080 01       		.uleb128 0x1
+ 2318 0081 13       		.uleb128 0x13
+ 2319 0082 00       		.byte	0
+ 2320 0083 00       		.byte	0
+ 2321 0084 0A       		.uleb128 0xa
+ 2322 0085 34       		.uleb128 0x34
+ 2323 0086 00       		.byte	0
+ 2324 0087 03       		.uleb128 0x3
+ 2325 0088 0E       		.uleb128 0xe
+ 2326 0089 3A       		.uleb128 0x3a
+ 2327 008a 0B       		.uleb128 0xb
+ 2328 008b 3B       		.uleb128 0x3b
+ 2329 008c 05       		.uleb128 0x5
+ 2330 008d 49       		.uleb128 0x49
+ 2331 008e 13       		.uleb128 0x13
+ 2332 008f 02       		.uleb128 0x2
+ 2333 0090 17       		.uleb128 0x17
+ 2334 0091 00       		.byte	0
+ 2335 0092 00       		.byte	0
+ 2336 0093 0B       		.uleb128 0xb
+ 2337 0094 898201   		.uleb128 0x4109
+ 2338 0097 00       		.byte	0
+ 2339 0098 11       		.uleb128 0x11
+ 2340 0099 01       		.uleb128 0x1
+ 2341 009a 31       		.uleb128 0x31
+ 2342 009b 13       		.uleb128 0x13
+ 2343 009c 00       		.byte	0
+ 2344 009d 00       		.byte	0
+ 2345 009e 0C       		.uleb128 0xc
+ 2346 009f 898201   		.uleb128 0x4109
+ 2347 00a2 01       		.byte	0x1
+ 2348 00a3 11       		.uleb128 0x11
+ 2349 00a4 01       		.uleb128 0x1
+ 2350 00a5 31       		.uleb128 0x31
+ 2351 00a6 13       		.uleb128 0x13
+ 2352 00a7 01       		.uleb128 0x1
+ 2353 00a8 13       		.uleb128 0x13
+ 2354 00a9 00       		.byte	0
+ 2355 00aa 00       		.byte	0
+ 2356 00ab 0D       		.uleb128 0xd
+ 2357 00ac 8A8201   		.uleb128 0x410a
+ 2358 00af 00       		.byte	0
+ 2359 00b0 02       		.uleb128 0x2
+ 2360 00b1 18       		.uleb128 0x18
+ 2361 00b2 9142     		.uleb128 0x2111
+ 2362 00b4 18       		.uleb128 0x18
+ 2363 00b5 00       		.byte	0
+ 2364 00b6 00       		.byte	0
+ 2365 00b7 0E       		.uleb128 0xe
+ 2366 00b8 2E       		.uleb128 0x2e
+ 2367 00b9 01       		.byte	0x1
+ 2368 00ba 3F       		.uleb128 0x3f
+ 2369 00bb 19       		.uleb128 0x19
+ 2370 00bc 03       		.uleb128 0x3
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 57
+
+
+ 2371 00bd 0E       		.uleb128 0xe
+ 2372 00be 3A       		.uleb128 0x3a
+ 2373 00bf 0B       		.uleb128 0xb
+ 2374 00c0 3B       		.uleb128 0x3b
+ 2375 00c1 05       		.uleb128 0x5
+ 2376 00c2 27       		.uleb128 0x27
+ 2377 00c3 19       		.uleb128 0x19
+ 2378 00c4 49       		.uleb128 0x49
+ 2379 00c5 13       		.uleb128 0x13
+ 2380 00c6 11       		.uleb128 0x11
+ 2381 00c7 01       		.uleb128 0x1
+ 2382 00c8 12       		.uleb128 0x12
+ 2383 00c9 06       		.uleb128 0x6
+ 2384 00ca 40       		.uleb128 0x40
+ 2385 00cb 18       		.uleb128 0x18
+ 2386 00cc 9642     		.uleb128 0x2116
+ 2387 00ce 19       		.uleb128 0x19
+ 2388 00cf 01       		.uleb128 0x1
+ 2389 00d0 13       		.uleb128 0x13
+ 2390 00d1 00       		.byte	0
+ 2391 00d2 00       		.byte	0
+ 2392 00d3 0F       		.uleb128 0xf
+ 2393 00d4 05       		.uleb128 0x5
+ 2394 00d5 00       		.byte	0
+ 2395 00d6 03       		.uleb128 0x3
+ 2396 00d7 0E       		.uleb128 0xe
+ 2397 00d8 3A       		.uleb128 0x3a
+ 2398 00d9 0B       		.uleb128 0xb
+ 2399 00da 3B       		.uleb128 0x3b
+ 2400 00db 05       		.uleb128 0x5
+ 2401 00dc 49       		.uleb128 0x49
+ 2402 00dd 13       		.uleb128 0x13
+ 2403 00de 02       		.uleb128 0x2
+ 2404 00df 17       		.uleb128 0x17
+ 2405 00e0 00       		.byte	0
+ 2406 00e1 00       		.byte	0
+ 2407 00e2 10       		.uleb128 0x10
+ 2408 00e3 34       		.uleb128 0x34
+ 2409 00e4 00       		.byte	0
+ 2410 00e5 03       		.uleb128 0x3
+ 2411 00e6 08       		.uleb128 0x8
+ 2412 00e7 3A       		.uleb128 0x3a
+ 2413 00e8 0B       		.uleb128 0xb
+ 2414 00e9 3B       		.uleb128 0x3b
+ 2415 00ea 05       		.uleb128 0x5
+ 2416 00eb 49       		.uleb128 0x49
+ 2417 00ec 13       		.uleb128 0x13
+ 2418 00ed 1C       		.uleb128 0x1c
+ 2419 00ee 0A       		.uleb128 0xa
+ 2420 00ef 00       		.byte	0
+ 2421 00f0 00       		.byte	0
+ 2422 00f1 11       		.uleb128 0x11
+ 2423 00f2 34       		.uleb128 0x34
+ 2424 00f3 00       		.byte	0
+ 2425 00f4 03       		.uleb128 0x3
+ 2426 00f5 08       		.uleb128 0x8
+ 2427 00f6 3A       		.uleb128 0x3a
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 58
+
+
+ 2428 00f7 0B       		.uleb128 0xb
+ 2429 00f8 3B       		.uleb128 0x3b
+ 2430 00f9 05       		.uleb128 0x5
+ 2431 00fa 49       		.uleb128 0x49
+ 2432 00fb 13       		.uleb128 0x13
+ 2433 00fc 02       		.uleb128 0x2
+ 2434 00fd 17       		.uleb128 0x17
+ 2435 00fe 00       		.byte	0
+ 2436 00ff 00       		.byte	0
+ 2437 0100 12       		.uleb128 0x12
+ 2438 0101 2E       		.uleb128 0x2e
+ 2439 0102 01       		.byte	0x1
+ 2440 0103 3F       		.uleb128 0x3f
+ 2441 0104 19       		.uleb128 0x19
+ 2442 0105 03       		.uleb128 0x3
+ 2443 0106 0E       		.uleb128 0xe
+ 2444 0107 3A       		.uleb128 0x3a
+ 2445 0108 0B       		.uleb128 0xb
+ 2446 0109 3B       		.uleb128 0x3b
+ 2447 010a 0B       		.uleb128 0xb
+ 2448 010b 49       		.uleb128 0x49
+ 2449 010c 13       		.uleb128 0x13
+ 2450 010d 8701     		.uleb128 0x87
+ 2451 010f 19       		.uleb128 0x19
+ 2452 0110 11       		.uleb128 0x11
+ 2453 0111 01       		.uleb128 0x1
+ 2454 0112 12       		.uleb128 0x12
+ 2455 0113 06       		.uleb128 0x6
+ 2456 0114 40       		.uleb128 0x40
+ 2457 0115 18       		.uleb128 0x18
+ 2458 0116 9642     		.uleb128 0x2116
+ 2459 0118 19       		.uleb128 0x19
+ 2460 0119 01       		.uleb128 0x1
+ 2461 011a 13       		.uleb128 0x13
+ 2462 011b 00       		.byte	0
+ 2463 011c 00       		.byte	0
+ 2464 011d 13       		.uleb128 0x13
+ 2465 011e 34       		.uleb128 0x34
+ 2466 011f 00       		.byte	0
+ 2467 0120 03       		.uleb128 0x3
+ 2468 0121 0E       		.uleb128 0xe
+ 2469 0122 3A       		.uleb128 0x3a
+ 2470 0123 0B       		.uleb128 0xb
+ 2471 0124 3B       		.uleb128 0x3b
+ 2472 0125 0B       		.uleb128 0xb
+ 2473 0126 49       		.uleb128 0x49
+ 2474 0127 13       		.uleb128 0x13
+ 2475 0128 02       		.uleb128 0x2
+ 2476 0129 18       		.uleb128 0x18
+ 2477 012a 00       		.byte	0
+ 2478 012b 00       		.byte	0
+ 2479 012c 14       		.uleb128 0x14
+ 2480 012d 34       		.uleb128 0x34
+ 2481 012e 00       		.byte	0
+ 2482 012f 03       		.uleb128 0x3
+ 2483 0130 0E       		.uleb128 0xe
+ 2484 0131 3A       		.uleb128 0x3a
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 59
+
+
+ 2485 0132 0B       		.uleb128 0xb
+ 2486 0133 3B       		.uleb128 0x3b
+ 2487 0134 0B       		.uleb128 0xb
+ 2488 0135 49       		.uleb128 0x49
+ 2489 0136 13       		.uleb128 0x13
+ 2490 0137 02       		.uleb128 0x2
+ 2491 0138 17       		.uleb128 0x17
+ 2492 0139 00       		.byte	0
+ 2493 013a 00       		.byte	0
+ 2494 013b 15       		.uleb128 0x15
+ 2495 013c 34       		.uleb128 0x34
+ 2496 013d 00       		.byte	0
+ 2497 013e 03       		.uleb128 0x3
+ 2498 013f 0E       		.uleb128 0xe
+ 2499 0140 3A       		.uleb128 0x3a
+ 2500 0141 0B       		.uleb128 0xb
+ 2501 0142 3B       		.uleb128 0x3b
+ 2502 0143 0B       		.uleb128 0xb
+ 2503 0144 49       		.uleb128 0x49
+ 2504 0145 13       		.uleb128 0x13
+ 2505 0146 00       		.byte	0
+ 2506 0147 00       		.byte	0
+ 2507 0148 16       		.uleb128 0x16
+ 2508 0149 34       		.uleb128 0x34
+ 2509 014a 00       		.byte	0
+ 2510 014b 03       		.uleb128 0x3
+ 2511 014c 0E       		.uleb128 0xe
+ 2512 014d 3A       		.uleb128 0x3a
+ 2513 014e 0B       		.uleb128 0xb
+ 2514 014f 3B       		.uleb128 0x3b
+ 2515 0150 0B       		.uleb128 0xb
+ 2516 0151 49       		.uleb128 0x49
+ 2517 0152 13       		.uleb128 0x13
+ 2518 0153 1C       		.uleb128 0x1c
+ 2519 0154 0B       		.uleb128 0xb
+ 2520 0155 00       		.byte	0
+ 2521 0156 00       		.byte	0
+ 2522 0157 17       		.uleb128 0x17
+ 2523 0158 0B       		.uleb128 0xb
+ 2524 0159 01       		.byte	0x1
+ 2525 015a 11       		.uleb128 0x11
+ 2526 015b 01       		.uleb128 0x1
+ 2527 015c 12       		.uleb128 0x12
+ 2528 015d 06       		.uleb128 0x6
+ 2529 015e 01       		.uleb128 0x1
+ 2530 015f 13       		.uleb128 0x13
+ 2531 0160 00       		.byte	0
+ 2532 0161 00       		.byte	0
+ 2533 0162 18       		.uleb128 0x18
+ 2534 0163 898201   		.uleb128 0x4109
+ 2535 0166 01       		.byte	0x1
+ 2536 0167 11       		.uleb128 0x11
+ 2537 0168 01       		.uleb128 0x1
+ 2538 0169 31       		.uleb128 0x31
+ 2539 016a 13       		.uleb128 0x13
+ 2540 016b 00       		.byte	0
+ 2541 016c 00       		.byte	0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 60
+
+
+ 2542 016d 19       		.uleb128 0x19
+ 2543 016e 01       		.uleb128 0x1
+ 2544 016f 01       		.byte	0x1
+ 2545 0170 49       		.uleb128 0x49
+ 2546 0171 13       		.uleb128 0x13
+ 2547 0172 01       		.uleb128 0x1
+ 2548 0173 13       		.uleb128 0x13
+ 2549 0174 00       		.byte	0
+ 2550 0175 00       		.byte	0
+ 2551 0176 1A       		.uleb128 0x1a
+ 2552 0177 21       		.uleb128 0x21
+ 2553 0178 00       		.byte	0
+ 2554 0179 49       		.uleb128 0x49
+ 2555 017a 13       		.uleb128 0x13
+ 2556 017b 2F       		.uleb128 0x2f
+ 2557 017c 0B       		.uleb128 0xb
+ 2558 017d 00       		.byte	0
+ 2559 017e 00       		.byte	0
+ 2560 017f 1B       		.uleb128 0x1b
+ 2561 0180 2E       		.uleb128 0x2e
+ 2562 0181 01       		.byte	0x1
+ 2563 0182 3F       		.uleb128 0x3f
+ 2564 0183 19       		.uleb128 0x19
+ 2565 0184 03       		.uleb128 0x3
+ 2566 0185 0E       		.uleb128 0xe
+ 2567 0186 3A       		.uleb128 0x3a
+ 2568 0187 0B       		.uleb128 0xb
+ 2569 0188 3B       		.uleb128 0x3b
+ 2570 0189 05       		.uleb128 0x5
+ 2571 018a 27       		.uleb128 0x27
+ 2572 018b 19       		.uleb128 0x19
+ 2573 018c 49       		.uleb128 0x49
+ 2574 018d 13       		.uleb128 0x13
+ 2575 018e 11       		.uleb128 0x11
+ 2576 018f 01       		.uleb128 0x1
+ 2577 0190 12       		.uleb128 0x12
+ 2578 0191 06       		.uleb128 0x6
+ 2579 0192 40       		.uleb128 0x40
+ 2580 0193 18       		.uleb128 0x18
+ 2581 0194 9742     		.uleb128 0x2117
+ 2582 0196 19       		.uleb128 0x19
+ 2583 0197 01       		.uleb128 0x1
+ 2584 0198 13       		.uleb128 0x13
+ 2585 0199 00       		.byte	0
+ 2586 019a 00       		.byte	0
+ 2587 019b 1C       		.uleb128 0x1c
+ 2588 019c 05       		.uleb128 0x5
+ 2589 019d 00       		.byte	0
+ 2590 019e 03       		.uleb128 0x3
+ 2591 019f 08       		.uleb128 0x8
+ 2592 01a0 3A       		.uleb128 0x3a
+ 2593 01a1 0B       		.uleb128 0xb
+ 2594 01a2 3B       		.uleb128 0x3b
+ 2595 01a3 05       		.uleb128 0x5
+ 2596 01a4 49       		.uleb128 0x49
+ 2597 01a5 13       		.uleb128 0x13
+ 2598 01a6 02       		.uleb128 0x2
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 61
+
+
+ 2599 01a7 17       		.uleb128 0x17
+ 2600 01a8 00       		.byte	0
+ 2601 01a9 00       		.byte	0
+ 2602 01aa 1D       		.uleb128 0x1d
+ 2603 01ab 34       		.uleb128 0x34
+ 2604 01ac 00       		.byte	0
+ 2605 01ad 03       		.uleb128 0x3
+ 2606 01ae 0E       		.uleb128 0xe
+ 2607 01af 3A       		.uleb128 0x3a
+ 2608 01b0 0B       		.uleb128 0xb
+ 2609 01b1 3B       		.uleb128 0x3b
+ 2610 01b2 05       		.uleb128 0x5
+ 2611 01b3 49       		.uleb128 0x49
+ 2612 01b4 13       		.uleb128 0x13
+ 2613 01b5 3F       		.uleb128 0x3f
+ 2614 01b6 19       		.uleb128 0x19
+ 2615 01b7 3C       		.uleb128 0x3c
+ 2616 01b8 19       		.uleb128 0x19
+ 2617 01b9 00       		.byte	0
+ 2618 01ba 00       		.byte	0
+ 2619 01bb 1E       		.uleb128 0x1e
+ 2620 01bc 35       		.uleb128 0x35
+ 2621 01bd 00       		.byte	0
+ 2622 01be 49       		.uleb128 0x49
+ 2623 01bf 13       		.uleb128 0x13
+ 2624 01c0 00       		.byte	0
+ 2625 01c1 00       		.byte	0
+ 2626 01c2 1F       		.uleb128 0x1f
+ 2627 01c3 2E       		.uleb128 0x2e
+ 2628 01c4 00       		.byte	0
+ 2629 01c5 3F       		.uleb128 0x3f
+ 2630 01c6 19       		.uleb128 0x19
+ 2631 01c7 3C       		.uleb128 0x3c
+ 2632 01c8 19       		.uleb128 0x19
+ 2633 01c9 6E       		.uleb128 0x6e
+ 2634 01ca 0E       		.uleb128 0xe
+ 2635 01cb 03       		.uleb128 0x3
+ 2636 01cc 0E       		.uleb128 0xe
+ 2637 01cd 3A       		.uleb128 0x3a
+ 2638 01ce 0B       		.uleb128 0xb
+ 2639 01cf 3B       		.uleb128 0x3b
+ 2640 01d0 0B       		.uleb128 0xb
+ 2641 01d1 00       		.byte	0
+ 2642 01d2 00       		.byte	0
+ 2643 01d3 20       		.uleb128 0x20
+ 2644 01d4 2E       		.uleb128 0x2e
+ 2645 01d5 00       		.byte	0
+ 2646 01d6 3F       		.uleb128 0x3f
+ 2647 01d7 19       		.uleb128 0x19
+ 2648 01d8 3C       		.uleb128 0x3c
+ 2649 01d9 19       		.uleb128 0x19
+ 2650 01da 6E       		.uleb128 0x6e
+ 2651 01db 0E       		.uleb128 0xe
+ 2652 01dc 03       		.uleb128 0x3
+ 2653 01dd 0E       		.uleb128 0xe
+ 2654 01de 3A       		.uleb128 0x3a
+ 2655 01df 0B       		.uleb128 0xb
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 62
+
+
+ 2656 01e0 3B       		.uleb128 0x3b
+ 2657 01e1 0B       		.uleb128 0xb
+ 2658 01e2 6E       		.uleb128 0x6e
+ 2659 01e3 0E       		.uleb128 0xe
+ 2660 01e4 00       		.byte	0
+ 2661 01e5 00       		.byte	0
+ 2662 01e6 00       		.byte	0
+ 2663              		.section	.debug_loc,"",%progbits
+ 2664              	.Ldebug_loc0:
+ 2665              	.LLST0:
+ 2666 0000 02000000 		.4byte	.LVL0
+ 2667 0004 12000000 		.4byte	.LVL3
+ 2668 0008 0200     		.2byte	0x2
+ 2669 000a 30       		.byte	0x30
+ 2670 000b 9F       		.byte	0x9f
+ 2671 000c 12000000 		.4byte	.LVL3
+ 2672 0010 15000000 		.4byte	.LVL4-1
+ 2673 0014 0100     		.2byte	0x1
+ 2674 0016 50       		.byte	0x50
+ 2675 0017 2C000000 		.4byte	.LVL8
+ 2676 001b 38000000 		.4byte	.LFE65
+ 2677 001f 0200     		.2byte	0x2
+ 2678 0021 30       		.byte	0x30
+ 2679 0022 9F       		.byte	0x9f
+ 2680 0023 00000000 		.4byte	0
+ 2681 0027 00000000 		.4byte	0
+ 2682              	.LLST1:
+ 2683 002b 00000000 		.4byte	.LVL9
+ 2684 002f 0E000000 		.4byte	.LVL12
+ 2685 0033 0100     		.2byte	0x1
+ 2686 0035 50       		.byte	0x50
+ 2687 0036 0E000000 		.4byte	.LVL12
+ 2688 003a 11000000 		.4byte	.LVL13-1
+ 2689 003e 0100     		.2byte	0x1
+ 2690 0040 51       		.byte	0x51
+ 2691 0041 11000000 		.4byte	.LVL13-1
+ 2692 0045 88000000 		.4byte	.LFE66
+ 2693 0049 0600     		.2byte	0x6
+ 2694 004b F3       		.byte	0xf3
+ 2695 004c 03       		.uleb128 0x3
+ 2696 004d F5       		.byte	0xf5
+ 2697 004e 00       		.uleb128 0
+ 2698 004f 25       		.uleb128 0x25
+ 2699 0050 9F       		.byte	0x9f
+ 2700 0051 00000000 		.4byte	0
+ 2701 0055 00000000 		.4byte	0
+ 2702              	.LLST2:
+ 2703 0059 00000000 		.4byte	.LVL9
+ 2704 005d 0C000000 		.4byte	.LVL11
+ 2705 0061 0100     		.2byte	0x1
+ 2706 0063 51       		.byte	0x51
+ 2707 0064 0C000000 		.4byte	.LVL11
+ 2708 0068 14000000 		.4byte	.LVL14
+ 2709 006c 0100     		.2byte	0x1
+ 2710 006e 54       		.byte	0x54
+ 2711 006f 14000000 		.4byte	.LVL14
+ 2712 0073 88000000 		.4byte	.LFE66
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 63
+
+
+ 2713 0077 0600     		.2byte	0x6
+ 2714 0079 F3       		.byte	0xf3
+ 2715 007a 03       		.uleb128 0x3
+ 2716 007b F5       		.byte	0xf5
+ 2717 007c 01       		.uleb128 0x1
+ 2718 007d 25       		.uleb128 0x25
+ 2719 007e 9F       		.byte	0x9f
+ 2720 007f 00000000 		.4byte	0
+ 2721 0083 00000000 		.4byte	0
+ 2722              	.LLST3:
+ 2723 0087 00000000 		.4byte	.LVL9
+ 2724 008b 11000000 		.4byte	.LVL13-1
+ 2725 008f 0100     		.2byte	0x1
+ 2726 0091 52       		.byte	0x52
+ 2727 0092 11000000 		.4byte	.LVL13-1
+ 2728 0096 28000000 		.4byte	.LVL17
+ 2729 009a 0100     		.2byte	0x1
+ 2730 009c 57       		.byte	0x57
+ 2731 009d 28000000 		.4byte	.LVL17
+ 2732 00a1 88000000 		.4byte	.LFE66
+ 2733 00a5 0400     		.2byte	0x4
+ 2734 00a7 F3       		.byte	0xf3
+ 2735 00a8 01       		.uleb128 0x1
+ 2736 00a9 52       		.byte	0x52
+ 2737 00aa 9F       		.byte	0x9f
+ 2738 00ab 00000000 		.4byte	0
+ 2739 00af 00000000 		.4byte	0
+ 2740              	.LLST4:
+ 2741 00b3 00000000 		.4byte	.LVL9
+ 2742 00b7 11000000 		.4byte	.LVL13-1
+ 2743 00bb 0100     		.2byte	0x1
+ 2744 00bd 53       		.byte	0x53
+ 2745 00be 11000000 		.4byte	.LVL13-1
+ 2746 00c2 7C000000 		.4byte	.LVL30
+ 2747 00c6 0100     		.2byte	0x1
+ 2748 00c8 56       		.byte	0x56
+ 2749 00c9 7C000000 		.4byte	.LVL30
+ 2750 00cd 88000000 		.4byte	.LFE66
+ 2751 00d1 0400     		.2byte	0x4
+ 2752 00d3 F3       		.byte	0xf3
+ 2753 00d4 01       		.uleb128 0x1
+ 2754 00d5 53       		.byte	0x53
+ 2755 00d6 9F       		.byte	0x9f
+ 2756 00d7 00000000 		.4byte	0
+ 2757 00db 00000000 		.4byte	0
+ 2758              	.LLST5:
+ 2759 00df 14000000 		.4byte	.LVL14
+ 2760 00e3 19000000 		.4byte	.LVL15-1
+ 2761 00e7 0100     		.2byte	0x1
+ 2762 00e9 50       		.byte	0x50
+ 2763 00ea 19000000 		.4byte	.LVL15-1
+ 2764 00ee 7C000000 		.4byte	.LVL30
+ 2765 00f2 0100     		.2byte	0x1
+ 2766 00f4 54       		.byte	0x54
+ 2767 00f5 7C000000 		.4byte	.LVL30
+ 2768 00f9 88000000 		.4byte	.LFE66
+ 2769 00fd 0300     		.2byte	0x3
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 64
+
+
+ 2770 00ff F3       		.byte	0xf3
+ 2771 0100 01       		.uleb128 0x1
+ 2772 0101 53       		.byte	0x53
+ 2773 0102 00000000 		.4byte	0
+ 2774 0106 00000000 		.4byte	0
+ 2775              	.LLST6:
+ 2776 010a 28000000 		.4byte	.LVL17
+ 2777 010e 2C000000 		.4byte	.LVL18
+ 2778 0112 0100     		.2byte	0x1
+ 2779 0114 50       		.byte	0x50
+ 2780 0115 2C000000 		.4byte	.LVL18
+ 2781 0119 7C000000 		.4byte	.LVL30
+ 2782 011d 0100     		.2byte	0x1
+ 2783 011f 57       		.byte	0x57
+ 2784 0120 00000000 		.4byte	0
+ 2785 0124 00000000 		.4byte	0
+ 2786              	.LLST7:
+ 2787 0128 56000000 		.4byte	.LVL24
+ 2788 012c 5D000000 		.4byte	.LVL25-1
+ 2789 0130 0100     		.2byte	0x1
+ 2790 0132 50       		.byte	0x50
+ 2791 0133 5D000000 		.4byte	.LVL25-1
+ 2792 0137 70000000 		.4byte	.LVL27
+ 2793 013b 0100     		.2byte	0x1
+ 2794 013d 55       		.byte	0x55
+ 2795 013e 72000000 		.4byte	.LVL28
+ 2796 0142 7C000000 		.4byte	.LVL30
+ 2797 0146 0100     		.2byte	0x1
+ 2798 0148 55       		.byte	0x55
+ 2799 0149 7C000000 		.4byte	.LVL30
+ 2800 014d 88000000 		.4byte	.LFE66
+ 2801 0151 0100     		.2byte	0x1
+ 2802 0153 50       		.byte	0x50
+ 2803 0154 00000000 		.4byte	0
+ 2804 0158 00000000 		.4byte	0
+ 2805              	.LLST8:
+ 2806 015c 24000000 		.4byte	.LVL36
+ 2807 0160 70000000 		.4byte	.LVL42
+ 2808 0164 0600     		.2byte	0x6
+ 2809 0166 9E       		.byte	0x9e
+ 2810 0167 04       		.uleb128 0x4
+ 2811 0168 00000000 		.4byte	0
+ 2812 016c 70000000 		.4byte	.LVL42
+ 2813 0170 80000000 		.4byte	.LVL45
+ 2814 0174 0300     		.2byte	0x3
+ 2815 0176 91       		.byte	0x91
+ 2816 0177 F47E     		.sleb128 -140
+ 2817 0179 80000000 		.4byte	.LVL45
+ 2818 017d 83000000 		.4byte	.LVL46-1
+ 2819 0181 0100     		.2byte	0x1
+ 2820 0183 50       		.byte	0x50
+ 2821 0184 83000000 		.4byte	.LVL46-1
+ 2822 0188 C2010000 		.4byte	.LVL81
+ 2823 018c 0300     		.2byte	0x3
+ 2824 018e 91       		.byte	0x91
+ 2825 018f F47E     		.sleb128 -140
+ 2826 0191 C2010000 		.4byte	.LVL81
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 65
+
+
+ 2827 0195 CE010000 		.4byte	.LVL84
+ 2828 0199 0100     		.2byte	0x1
+ 2829 019b 56       		.byte	0x56
+ 2830 019c CE010000 		.4byte	.LVL84
+ 2831 01a0 A0030000 		.4byte	.LVL148
+ 2832 01a4 0300     		.2byte	0x3
+ 2833 01a6 91       		.byte	0x91
+ 2834 01a7 F47E     		.sleb128 -140
+ 2835 01a9 A0030000 		.4byte	.LVL148
+ 2836 01ad B8030000 		.4byte	.LVL153
+ 2837 01b1 0100     		.2byte	0x1
+ 2838 01b3 56       		.byte	0x56
+ 2839 01b4 B8030000 		.4byte	.LVL153
+ 2840 01b8 CC030000 		.4byte	.LFE64
+ 2841 01bc 0300     		.2byte	0x3
+ 2842 01be 91       		.byte	0x91
+ 2843 01bf F47E     		.sleb128 -140
+ 2844 01c1 00000000 		.4byte	0
+ 2845 01c5 00000000 		.4byte	0
+ 2846              	.LLST9:
+ 2847 01c9 24000000 		.4byte	.LVL36
+ 2848 01cd 70000000 		.4byte	.LVL42
+ 2849 01d1 0600     		.2byte	0x6
+ 2850 01d3 0C       		.byte	0xc
+ 2851 01d4 0046C323 		.4byte	0x23c34600
+ 2852 01d8 9F       		.byte	0x9f
+ 2853 01d9 70000000 		.4byte	.LVL42
+ 2854 01dd 8E000000 		.4byte	.LVL47
+ 2855 01e1 0100     		.2byte	0x1
+ 2856 01e3 54       		.byte	0x54
+ 2857 01e4 8E000000 		.4byte	.LVL47
+ 2858 01e8 90000000 		.4byte	.LVL48
+ 2859 01ec 0200     		.2byte	0x2
+ 2860 01ee 30       		.byte	0x30
+ 2861 01ef 9F       		.byte	0x9f
+ 2862 01f0 90000000 		.4byte	.LVL48
+ 2863 01f4 CC030000 		.4byte	.LFE64
+ 2864 01f8 0100     		.2byte	0x1
+ 2865 01fa 54       		.byte	0x54
+ 2866 01fb 00000000 		.4byte	0
+ 2867 01ff 00000000 		.4byte	0
+ 2868              	.LLST10:
+ 2869 0203 24000000 		.4byte	.LVL36
+ 2870 0207 70000000 		.4byte	.LVL42
+ 2871 020b 0200     		.2byte	0x2
+ 2872 020d 30       		.byte	0x30
+ 2873 020e 9F       		.byte	0x9f
+ 2874 020f 70000000 		.4byte	.LVL42
+ 2875 0213 B8000000 		.4byte	.LVL52
+ 2876 0217 0100     		.2byte	0x1
+ 2877 0219 55       		.byte	0x55
+ 2878 021a B8000000 		.4byte	.LVL52
+ 2879 021e BC000000 		.4byte	.LVL53
+ 2880 0222 0200     		.2byte	0x2
+ 2881 0224 30       		.byte	0x30
+ 2882 0225 9F       		.byte	0x9f
+ 2883 0226 BC000000 		.4byte	.LVL53
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 66
+
+
+ 2884 022a 14010000 		.4byte	.LVL61
+ 2885 022e 0100     		.2byte	0x1
+ 2886 0230 55       		.byte	0x55
+ 2887 0231 14010000 		.4byte	.LVL61
+ 2888 0235 16010000 		.4byte	.LVL62
+ 2889 0239 0200     		.2byte	0x2
+ 2890 023b 30       		.byte	0x30
+ 2891 023c 9F       		.byte	0x9f
+ 2892 023d 16010000 		.4byte	.LVL62
+ 2893 0241 56010000 		.4byte	.LVL69
+ 2894 0245 0100     		.2byte	0x1
+ 2895 0247 55       		.byte	0x55
+ 2896 0248 56010000 		.4byte	.LVL69
+ 2897 024c 58010000 		.4byte	.LVL70
+ 2898 0250 0200     		.2byte	0x2
+ 2899 0252 30       		.byte	0x30
+ 2900 0253 9F       		.byte	0x9f
+ 2901 0254 58010000 		.4byte	.LVL70
+ 2902 0258 CC030000 		.4byte	.LFE64
+ 2903 025c 0100     		.2byte	0x1
+ 2904 025e 55       		.byte	0x55
+ 2905 025f 00000000 		.4byte	0
+ 2906 0263 00000000 		.4byte	0
+ 2907              	.LLST11:
+ 2908 0267 24000000 		.4byte	.LVL36
+ 2909 026b 70000000 		.4byte	.LVL42
+ 2910 026f 0200     		.2byte	0x2
+ 2911 0271 30       		.byte	0x30
+ 2912 0272 9F       		.byte	0x9f
+ 2913 0273 70000000 		.4byte	.LVL42
+ 2914 0277 CC030000 		.4byte	.LFE64
+ 2915 027b 0100     		.2byte	0x1
+ 2916 027d 59       		.byte	0x59
+ 2917 027e 00000000 		.4byte	0
+ 2918 0282 00000000 		.4byte	0
+ 2919              	.LLST12:
+ 2920 0286 24000000 		.4byte	.LVL36
+ 2921 028a 70000000 		.4byte	.LVL42
+ 2922 028e 0200     		.2byte	0x2
+ 2923 0290 31       		.byte	0x31
+ 2924 0291 9F       		.byte	0x9f
+ 2925 0292 70000000 		.4byte	.LVL42
+ 2926 0296 CC030000 		.4byte	.LFE64
+ 2927 029a 0100     		.2byte	0x1
+ 2928 029c 5B       		.byte	0x5b
+ 2929 029d 00000000 		.4byte	0
+ 2930 02a1 00000000 		.4byte	0
+ 2931              	.LLST13:
+ 2932 02a5 24000000 		.4byte	.LVL36
+ 2933 02a9 70000000 		.4byte	.LVL42
+ 2934 02ad 0200     		.2byte	0x2
+ 2935 02af 30       		.byte	0x30
+ 2936 02b0 9F       		.byte	0x9f
+ 2937 02b1 E6000000 		.4byte	.LVL57
+ 2938 02b5 CC030000 		.4byte	.LFE64
+ 2939 02b9 0100     		.2byte	0x1
+ 2940 02bb 57       		.byte	0x57
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 67
+
+
+ 2941 02bc 00000000 		.4byte	0
+ 2942 02c0 00000000 		.4byte	0
+ 2943              	.LLST14:
+ 2944 02c4 24000000 		.4byte	.LVL36
+ 2945 02c8 70000000 		.4byte	.LVL42
+ 2946 02cc 0600     		.2byte	0x6
+ 2947 02ce 9E       		.byte	0x9e
+ 2948 02cf 04       		.uleb128 0x4
+ 2949 02d0 00007F43 		.4byte	0x437f0000
+ 2950 02d4 70000000 		.4byte	.LVL42
+ 2951 02d8 B4030000 		.4byte	.LVL152
+ 2952 02dc 0300     		.2byte	0x3
+ 2953 02de 91       		.byte	0x91
+ 2954 02df 907F     		.sleb128 -112
+ 2955 02e1 B4030000 		.4byte	.LVL152
+ 2956 02e5 B8030000 		.4byte	.LVL153
+ 2957 02e9 0100     		.2byte	0x1
+ 2958 02eb 50       		.byte	0x50
+ 2959 02ec B8030000 		.4byte	.LVL153
+ 2960 02f0 CC030000 		.4byte	.LFE64
+ 2961 02f4 0300     		.2byte	0x3
+ 2962 02f6 91       		.byte	0x91
+ 2963 02f7 907F     		.sleb128 -112
+ 2964 02f9 00000000 		.4byte	0
+ 2965 02fd 00000000 		.4byte	0
+ 2966              	.LLST15:
+ 2967 0301 24000000 		.4byte	.LVL36
+ 2968 0305 70000000 		.4byte	.LVL42
+ 2969 0309 0600     		.2byte	0x6
+ 2970 030b 9E       		.byte	0x9e
+ 2971 030c 04       		.uleb128 0x4
+ 2972 030d 0000803F 		.4byte	0x3f800000
+ 2973 0311 70000000 		.4byte	.LVL42
+ 2974 0315 0C030000 		.4byte	.LVL121
+ 2975 0319 0300     		.2byte	0x3
+ 2976 031b 91       		.byte	0x91
+ 2977 031c 807F     		.sleb128 -128
+ 2978 031e 0C030000 		.4byte	.LVL121
+ 2979 0322 1A030000 		.4byte	.LVL122
+ 2980 0326 0100     		.2byte	0x1
+ 2981 0328 50       		.byte	0x50
+ 2982 0329 1A030000 		.4byte	.LVL122
+ 2983 032d 1C030000 		.4byte	.LVL123
+ 2984 0331 0300     		.2byte	0x3
+ 2985 0333 91       		.byte	0x91
+ 2986 0334 807F     		.sleb128 -128
+ 2987 0336 1C030000 		.4byte	.LVL123
+ 2988 033a 1E030000 		.4byte	.LVL124
+ 2989 033e 0100     		.2byte	0x1
+ 2990 0340 50       		.byte	0x50
+ 2991 0341 1E030000 		.4byte	.LVL124
+ 2992 0345 20030000 		.4byte	.LVL125
+ 2993 0349 0300     		.2byte	0x3
+ 2994 034b 91       		.byte	0x91
+ 2995 034c 807F     		.sleb128 -128
+ 2996 034e 20030000 		.4byte	.LVL125
+ 2997 0352 22030000 		.4byte	.LVL126
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 68
+
+
+ 2998 0356 0100     		.2byte	0x1
+ 2999 0358 50       		.byte	0x50
+ 3000 0359 22030000 		.4byte	.LVL126
+ 3001 035d CC030000 		.4byte	.LFE64
+ 3002 0361 0300     		.2byte	0x3
+ 3003 0363 91       		.byte	0x91
+ 3004 0364 807F     		.sleb128 -128
+ 3005 0366 00000000 		.4byte	0
+ 3006 036a 00000000 		.4byte	0
+ 3007              	.LLST16:
+ 3008 036e 24000000 		.4byte	.LVL36
+ 3009 0372 70000000 		.4byte	.LVL42
+ 3010 0376 0600     		.2byte	0x6
+ 3011 0378 9E       		.byte	0x9e
+ 3012 0379 04       		.uleb128 0x4
+ 3013 037a 0000803F 		.4byte	0x3f800000
+ 3014 037e 70000000 		.4byte	.LVL42
+ 3015 0382 34030000 		.4byte	.LVL129
+ 3016 0386 0300     		.2byte	0x3
+ 3017 0388 91       		.byte	0x91
+ 3018 0389 847F     		.sleb128 -124
+ 3019 038b 34030000 		.4byte	.LVL129
+ 3020 038f 3A030000 		.4byte	.LVL130
+ 3021 0393 0100     		.2byte	0x1
+ 3022 0395 50       		.byte	0x50
+ 3023 0396 3A030000 		.4byte	.LVL130
+ 3024 039a CC030000 		.4byte	.LFE64
+ 3025 039e 0300     		.2byte	0x3
+ 3026 03a0 91       		.byte	0x91
+ 3027 03a1 847F     		.sleb128 -124
+ 3028 03a3 00000000 		.4byte	0
+ 3029 03a7 00000000 		.4byte	0
+ 3030              	.LLST17:
+ 3031 03ab 36000000 		.4byte	.LVL37
+ 3032 03af 70000000 		.4byte	.LVL42
+ 3033 03b3 0200     		.2byte	0x2
+ 3034 03b5 30       		.byte	0x30
+ 3035 03b6 9F       		.byte	0x9f
+ 3036 03b7 70000000 		.4byte	.LVL42
+ 3037 03bb A8020000 		.4byte	.LVL109
+ 3038 03bf 0100     		.2byte	0x1
+ 3039 03c1 58       		.byte	0x58
+ 3040 03c2 AA020000 		.4byte	.LVL110
+ 3041 03c6 B0020000 		.4byte	.LVL112
+ 3042 03ca 0100     		.2byte	0x1
+ 3043 03cc 58       		.byte	0x58
+ 3044 03cd D0020000 		.4byte	.LVL113
+ 3045 03d1 D6020000 		.4byte	.LVL116
+ 3046 03d5 0100     		.2byte	0x1
+ 3047 03d7 58       		.byte	0x58
+ 3048 03d8 E8020000 		.4byte	.LVL118
+ 3049 03dc CC030000 		.4byte	.LFE64
+ 3050 03e0 0100     		.2byte	0x1
+ 3051 03e2 58       		.byte	0x58
+ 3052 03e3 00000000 		.4byte	0
+ 3053 03e7 00000000 		.4byte	0
+ 3054              	.LLST18:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 69
+
+
+ 3055 03eb 36000000 		.4byte	.LVL37
+ 3056 03ef 70000000 		.4byte	.LVL42
+ 3057 03f3 0200     		.2byte	0x2
+ 3058 03f5 30       		.byte	0x30
+ 3059 03f6 9F       		.byte	0x9f
+ 3060 03f7 70000000 		.4byte	.LVL42
+ 3061 03fb A6020000 		.4byte	.LVL108
+ 3062 03ff 0300     		.2byte	0x3
+ 3063 0401 91       		.byte	0x91
+ 3064 0402 F87E     		.sleb128 -136
+ 3065 0404 AA020000 		.4byte	.LVL110
+ 3066 0408 AE020000 		.4byte	.LVL111
+ 3067 040c 0300     		.2byte	0x3
+ 3068 040e 91       		.byte	0x91
+ 3069 040f F87E     		.sleb128 -136
+ 3070 0411 D0020000 		.4byte	.LVL113
+ 3071 0415 D4020000 		.4byte	.LVL115
+ 3072 0419 0300     		.2byte	0x3
+ 3073 041b 91       		.byte	0x91
+ 3074 041c F87E     		.sleb128 -136
+ 3075 041e E8020000 		.4byte	.LVL118
+ 3076 0422 CC030000 		.4byte	.LFE64
+ 3077 0426 0300     		.2byte	0x3
+ 3078 0428 91       		.byte	0x91
+ 3079 0429 F87E     		.sleb128 -136
+ 3080 042b 00000000 		.4byte	0
+ 3081 042f 00000000 		.4byte	0
+ 3082              	.LLST19:
+ 3083 0433 40000000 		.4byte	.LVL38
+ 3084 0437 70000000 		.4byte	.LVL42
+ 3085 043b 0200     		.2byte	0x2
+ 3086 043d 31       		.byte	0x31
+ 3087 043e 9F       		.byte	0x9f
+ 3088 043f 70000000 		.4byte	.LVL42
+ 3089 0443 CC030000 		.4byte	.LFE64
+ 3090 0447 0100     		.2byte	0x1
+ 3091 0449 5A       		.byte	0x5a
+ 3092 044a 00000000 		.4byte	0
+ 3093 044e 00000000 		.4byte	0
+ 3094              	.LLST20:
+ 3095 0452 D0000000 		.4byte	.LVL56
+ 3096 0456 10010000 		.4byte	.LVL60
+ 3097 045a 0100     		.2byte	0x1
+ 3098 045c 50       		.byte	0x50
+ 3099 045d 48010000 		.4byte	.LVL66
+ 3100 0461 52010000 		.4byte	.LVL68
+ 3101 0465 0100     		.2byte	0x1
+ 3102 0467 50       		.byte	0x50
+ 3103 0468 8A010000 		.4byte	.LVL74
+ 3104 046c 98010000 		.4byte	.LVL75
+ 3105 0470 0100     		.2byte	0x1
+ 3106 0472 50       		.byte	0x50
+ 3107 0473 C2010000 		.4byte	.LVL81
+ 3108 0477 C4010000 		.4byte	.LVL82
+ 3109 047b 0100     		.2byte	0x1
+ 3110 047d 50       		.byte	0x50
+ 3111 047e A0030000 		.4byte	.LVL148
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 70
+
+
+ 3112 0482 A4030000 		.4byte	.LVL149
+ 3113 0486 0100     		.2byte	0x1
+ 3114 0488 50       		.byte	0x50
+ 3115 0489 00000000 		.4byte	0
+ 3116 048d 00000000 		.4byte	0
+ 3117              	.LLST21:
+ 3118 0491 48020000 		.4byte	.LVL97
+ 3119 0495 7A020000 		.4byte	.LVL103
+ 3120 0499 0200     		.2byte	0x2
+ 3121 049b 30       		.byte	0x30
+ 3122 049c 9F       		.byte	0x9f
+ 3123 049d 7A020000 		.4byte	.LVL103
+ 3124 04a1 D6020000 		.4byte	.LVL116
+ 3125 04a5 0100     		.2byte	0x1
+ 3126 04a7 56       		.byte	0x56
+ 3127 04a8 D6020000 		.4byte	.LVL116
+ 3128 04ac A0030000 		.4byte	.LVL148
+ 3129 04b0 0100     		.2byte	0x1
+ 3130 04b2 58       		.byte	0x58
+ 3131 04b3 00000000 		.4byte	0
+ 3132 04b7 00000000 		.4byte	0
+ 3133              	.LLST22:
+ 3134 04bb 48020000 		.4byte	.LVL97
+ 3135 04bf 5C020000 		.4byte	.LVL99
+ 3136 04c3 0200     		.2byte	0x2
+ 3137 04c5 30       		.byte	0x30
+ 3138 04c6 9F       		.byte	0x9f
+ 3139 04c7 5C020000 		.4byte	.LVL99
+ 3140 04cb 9C020000 		.4byte	.LVL106
+ 3141 04cf 0300     		.2byte	0x3
+ 3142 04d1 91       		.byte	0x91
+ 3143 04d2 FC7E     		.sleb128 -132
+ 3144 04d4 9E020000 		.4byte	.LVL107
+ 3145 04d8 D0020000 		.4byte	.LVL113
+ 3146 04dc 0300     		.2byte	0x3
+ 3147 04de 91       		.byte	0x91
+ 3148 04df FC7E     		.sleb128 -132
+ 3149 04e1 D0020000 		.4byte	.LVL113
+ 3150 04e5 D2020000 		.4byte	.LVL114
+ 3151 04e9 0100     		.2byte	0x1
+ 3152 04eb 53       		.byte	0x53
+ 3153 04ec D2020000 		.4byte	.LVL114
+ 3154 04f0 D6020000 		.4byte	.LVL116
+ 3155 04f4 0300     		.2byte	0x3
+ 3156 04f6 91       		.byte	0x91
+ 3157 04f7 FC7E     		.sleb128 -132
+ 3158 04f9 D6020000 		.4byte	.LVL116
+ 3159 04fd E6020000 		.4byte	.LVL117
+ 3160 0501 0300     		.2byte	0x3
+ 3161 0503 91       		.byte	0x91
+ 3162 0504 F87E     		.sleb128 -136
+ 3163 0506 E8020000 		.4byte	.LVL118
+ 3164 050a A0030000 		.4byte	.LVL148
+ 3165 050e 0300     		.2byte	0x3
+ 3166 0510 91       		.byte	0x91
+ 3167 0511 F87E     		.sleb128 -136
+ 3168 0513 00000000 		.4byte	0
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 71
+
+
+ 3169 0517 00000000 		.4byte	0
+ 3170              	.LLST23:
+ 3171 051b 48020000 		.4byte	.LVL97
+ 3172 051f A0030000 		.4byte	.LVL148
+ 3173 0523 0600     		.2byte	0x6
+ 3174 0525 9E       		.byte	0x9e
+ 3175 0526 04       		.uleb128 0x4
+ 3176 0527 CDCC4C3E 		.4byte	0x3e4ccccd
+ 3177 052b 00000000 		.4byte	0
+ 3178 052f 00000000 		.4byte	0
+ 3179              	.LLST24:
+ 3180 0533 40030000 		.4byte	.LVL132
+ 3181 0537 44030000 		.4byte	.LVL133
+ 3182 053b 0100     		.2byte	0x1
+ 3183 053d 50       		.byte	0x50
+ 3184 053e 44030000 		.4byte	.LVL133
+ 3185 0542 54030000 		.4byte	.LVL136
+ 3186 0546 0300     		.2byte	0x3
+ 3187 0548 91       		.byte	0x91
+ 3188 0549 FC7E     		.sleb128 -132
+ 3189 054b 56030000 		.4byte	.LVL137
+ 3190 054f A0030000 		.4byte	.LVL148
+ 3191 0553 0300     		.2byte	0x3
+ 3192 0555 91       		.byte	0x91
+ 3193 0556 FC7E     		.sleb128 -132
+ 3194 0558 00000000 		.4byte	0
+ 3195 055c 00000000 		.4byte	0
+ 3196              	.LLST25:
+ 3197 0560 4A030000 		.4byte	.LVL135
+ 3198 0564 56030000 		.4byte	.LVL137
+ 3199 0568 0100     		.2byte	0x1
+ 3200 056a 50       		.byte	0x50
+ 3201 056b 56030000 		.4byte	.LVL137
+ 3202 056f 5E030000 		.4byte	.LVL138
+ 3203 0573 0100     		.2byte	0x1
+ 3204 0575 56       		.byte	0x56
+ 3205 0576 62030000 		.4byte	.LVL139
+ 3206 057a 88030000 		.4byte	.LVL144
+ 3207 057e 0100     		.2byte	0x1
+ 3208 0580 56       		.byte	0x56
+ 3209 0581 00000000 		.4byte	0
+ 3210 0585 00000000 		.4byte	0
+ 3211              	.LLST26:
+ 3212 0589 00000000 		.4byte	.LVL156
+ 3213 058d 0A000000 		.4byte	.LVL158
+ 3214 0591 0100     		.2byte	0x1
+ 3215 0593 50       		.byte	0x50
+ 3216 0594 0A000000 		.4byte	.LVL158
+ 3217 0598 2A000000 		.4byte	.LFE67
+ 3218 059c 0400     		.2byte	0x4
+ 3219 059e F3       		.byte	0xf3
+ 3220 059f 01       		.uleb128 0x1
+ 3221 05a0 50       		.byte	0x50
+ 3222 05a1 9F       		.byte	0x9f
+ 3223 05a2 00000000 		.4byte	0
+ 3224 05a6 00000000 		.4byte	0
+ 3225              	.LLST27:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 72
+
+
+ 3226 05aa 00000000 		.4byte	.LVL156
+ 3227 05ae 0A000000 		.4byte	.LVL158
+ 3228 05b2 0100     		.2byte	0x1
+ 3229 05b4 51       		.byte	0x51
+ 3230 05b5 0A000000 		.4byte	.LVL158
+ 3231 05b9 18000000 		.4byte	.LVL160
+ 3232 05bd 0100     		.2byte	0x1
+ 3233 05bf 54       		.byte	0x54
+ 3234 05c0 18000000 		.4byte	.LVL160
+ 3235 05c4 22000000 		.4byte	.LVL163
+ 3236 05c8 0100     		.2byte	0x1
+ 3237 05ca 56       		.byte	0x56
+ 3238 05cb 22000000 		.4byte	.LVL163
+ 3239 05cf 2A000000 		.4byte	.LFE67
+ 3240 05d3 0100     		.2byte	0x1
+ 3241 05d5 54       		.byte	0x54
+ 3242 05d6 00000000 		.4byte	0
+ 3243 05da 00000000 		.4byte	0
+ 3244              	.LLST28:
+ 3245 05de 00000000 		.4byte	.LVL156
+ 3246 05e2 0A000000 		.4byte	.LVL158
+ 3247 05e6 0100     		.2byte	0x1
+ 3248 05e8 52       		.byte	0x52
+ 3249 05e9 0A000000 		.4byte	.LVL158
+ 3250 05ed 2A000000 		.4byte	.LFE67
+ 3251 05f1 0100     		.2byte	0x1
+ 3252 05f3 57       		.byte	0x57
+ 3253 05f4 00000000 		.4byte	0
+ 3254 05f8 00000000 		.4byte	0
+ 3255              	.LLST29:
+ 3256 05fc 06000000 		.4byte	.LVL157
+ 3257 0600 0A000000 		.4byte	.LVL158
+ 3258 0604 0200     		.2byte	0x2
+ 3259 0606 30       		.byte	0x30
+ 3260 0607 9F       		.byte	0x9f
+ 3261 0608 0A000000 		.4byte	.LVL158
+ 3262 060c 2A000000 		.4byte	.LFE67
+ 3263 0610 0100     		.2byte	0x1
+ 3264 0612 55       		.byte	0x55
+ 3265 0613 00000000 		.4byte	0
+ 3266 0617 00000000 		.4byte	0
+ 3267              	.LLST30:
+ 3268 061b 00000000 		.4byte	.LVL164
+ 3269 061f 0A000000 		.4byte	.LVL166
+ 3270 0623 0100     		.2byte	0x1
+ 3271 0625 50       		.byte	0x50
+ 3272 0626 0A000000 		.4byte	.LVL166
+ 3273 062a 38000000 		.4byte	.LFE68
+ 3274 062e 0400     		.2byte	0x4
+ 3275 0630 F3       		.byte	0xf3
+ 3276 0631 01       		.uleb128 0x1
+ 3277 0632 50       		.byte	0x50
+ 3278 0633 9F       		.byte	0x9f
+ 3279 0634 00000000 		.4byte	0
+ 3280 0638 00000000 		.4byte	0
+ 3281              	.LLST31:
+ 3282 063c 00000000 		.4byte	.LVL164
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 73
+
+
+ 3283 0640 0A000000 		.4byte	.LVL166
+ 3284 0644 0100     		.2byte	0x1
+ 3285 0646 51       		.byte	0x51
+ 3286 0647 0A000000 		.4byte	.LVL166
+ 3287 064b 26000000 		.4byte	.LVL173
+ 3288 064f 0100     		.2byte	0x1
+ 3289 0651 57       		.byte	0x57
+ 3290 0652 26000000 		.4byte	.LVL173
+ 3291 0656 30000000 		.4byte	.LVL175
+ 3292 065a 0100     		.2byte	0x1
+ 3293 065c 53       		.byte	0x53
+ 3294 065d 30000000 		.4byte	.LVL175
+ 3295 0661 34000000 		.4byte	.LVL176
+ 3296 0665 0100     		.2byte	0x1
+ 3297 0667 57       		.byte	0x57
+ 3298 0668 00000000 		.4byte	0
+ 3299 066c 00000000 		.4byte	0
+ 3300              	.LLST32:
+ 3301 0670 00000000 		.4byte	.LVL164
+ 3302 0674 0A000000 		.4byte	.LVL166
+ 3303 0678 0100     		.2byte	0x1
+ 3304 067a 52       		.byte	0x52
+ 3305 067b 0A000000 		.4byte	.LVL166
+ 3306 067f 38000000 		.4byte	.LFE68
+ 3307 0683 0100     		.2byte	0x1
+ 3308 0685 54       		.byte	0x54
+ 3309 0686 00000000 		.4byte	0
+ 3310 068a 00000000 		.4byte	0
+ 3311              	.LLST33:
+ 3312 068e 06000000 		.4byte	.LVL165
+ 3313 0692 0A000000 		.4byte	.LVL166
+ 3314 0696 0200     		.2byte	0x2
+ 3315 0698 30       		.byte	0x30
+ 3316 0699 9F       		.byte	0x9f
+ 3317 069a 0A000000 		.4byte	.LVL166
+ 3318 069e 38000000 		.4byte	.LFE68
+ 3319 06a2 0100     		.2byte	0x1
+ 3320 06a4 56       		.byte	0x56
+ 3321 06a5 00000000 		.4byte	0
+ 3322 06a9 00000000 		.4byte	0
+ 3323              	.LLST34:
+ 3324 06ad 0E000000 		.4byte	.LVL167
+ 3325 06b1 15000000 		.4byte	.LVL168-1
+ 3326 06b5 0100     		.2byte	0x1
+ 3327 06b7 50       		.byte	0x50
+ 3328 06b8 1C000000 		.4byte	.LVL170
+ 3329 06bc 24000000 		.4byte	.LVL172
+ 3330 06c0 0200     		.2byte	0x2
+ 3331 06c2 3A       		.byte	0x3a
+ 3332 06c3 9F       		.byte	0x9f
+ 3333 06c4 24000000 		.4byte	.LVL172
+ 3334 06c8 30000000 		.4byte	.LVL175
+ 3335 06cc 0100     		.2byte	0x1
+ 3336 06ce 55       		.byte	0x55
+ 3337 06cf 00000000 		.4byte	0
+ 3338 06d3 00000000 		.4byte	0
+ 3339              		.section	.debug_aranges,"",%progbits
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 74
+
+
+ 3340 0000 3C000000 		.4byte	0x3c
+ 3341 0004 0200     		.2byte	0x2
+ 3342 0006 00000000 		.4byte	.Ldebug_info0
+ 3343 000a 04       		.byte	0x4
+ 3344 000b 00       		.byte	0
+ 3345 000c 0000     		.2byte	0
+ 3346 000e 0000     		.2byte	0
+ 3347 0010 00000000 		.4byte	.LFB65
+ 3348 0014 38000000 		.4byte	.LFE65-.LFB65
+ 3349 0018 00000000 		.4byte	.LFB66
+ 3350 001c 88000000 		.4byte	.LFE66-.LFB66
+ 3351 0020 00000000 		.4byte	.LFB64
+ 3352 0024 CC030000 		.4byte	.LFE64-.LFB64
+ 3353 0028 00000000 		.4byte	.LFB67
+ 3354 002c 2A000000 		.4byte	.LFE67-.LFB67
+ 3355 0030 00000000 		.4byte	.LFB68
+ 3356 0034 38000000 		.4byte	.LFE68-.LFB68
+ 3357 0038 00000000 		.4byte	0
+ 3358 003c 00000000 		.4byte	0
+ 3359              		.section	.debug_ranges,"",%progbits
+ 3360              	.Ldebug_ranges0:
+ 3361 0000 00000000 		.4byte	.LFB65
+ 3362 0004 38000000 		.4byte	.LFE65
+ 3363 0008 00000000 		.4byte	.LFB66
+ 3364 000c 88000000 		.4byte	.LFE66
+ 3365 0010 00000000 		.4byte	.LFB64
+ 3366 0014 CC030000 		.4byte	.LFE64
+ 3367 0018 00000000 		.4byte	.LFB67
+ 3368 001c 2A000000 		.4byte	.LFE67
+ 3369 0020 00000000 		.4byte	.LFB68
+ 3370 0024 38000000 		.4byte	.LFE68
+ 3371 0028 00000000 		.4byte	0
+ 3372 002c 00000000 		.4byte	0
+ 3373              		.section	.debug_line,"",%progbits
+ 3374              	.Ldebug_line0:
+ 3375 0000 EF030000 		.section	.debug_str,"MS",%progbits,1
+ 3375      02005E02 
+ 3375      00000201 
+ 3375      FB0E0D00 
+ 3375      01010101 
+ 3376              	.LASF39:
+ 3377 0000 626C6163 		.ascii	"black\000"
+ 3377      6B00
+ 3378              	.LASF79:
+ 3379 0006 55415254 		.ascii	"UART_1_GetChar\000"
+ 3379      5F315F47 
+ 3379      65744368 
+ 3379      617200
+ 3380              	.LASF53:
+ 3381 0015 72696768 		.ascii	"right\000"
+ 3381      7400
+ 3382              	.LASF22:
+ 3383 001b 6C617374 		.ascii	"lastError\000"
+ 3383      4572726F 
+ 3383      7200
+ 3384              	.LASF47:
+ 3385 0025 73746174 		.ascii	"state\000"
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 75
+
+
+ 3385      6500
+ 3386              	.LASF20:
+ 3387 002b 74617267 		.ascii	"target\000"
+ 3387      657400
+ 3388              	.LASF4:
+ 3389 0032 73686F72 		.ascii	"short int\000"
+ 3389      7420696E 
+ 3389      7400
+ 3390              	.LASF18:
+ 3391 003c 73697A65 		.ascii	"sizetype\000"
+ 3391      74797065 
+ 3391      00
+ 3392              	.LASF37:
+ 3393 0045 72696768 		.ascii	"rightControl\000"
+ 3393      74436F6E 
+ 3393      74726F6C 
+ 3393      00
+ 3394              	.LASF50:
+ 3395 0052 73746F70 		.ascii	"stopCount\000"
+ 3395      436F756E 
+ 3395      7400
+ 3396              	.LASF56:
+ 3397 005c 72696768 		.ascii	"rightSpeed\000"
+ 3397      74537065 
+ 3397      656400
+ 3398              	.LASF25:
+ 3399 0067 64657269 		.ascii	"derivate\000"
+ 3399      76617465 
+ 3399      00
+ 3400              	.LASF28:
+ 3401 0070 73656E73 		.ascii	"sensors\000"
+ 3401      6F727300 
+ 3402              	.LASF30:
+ 3403 0078 6C6F6F70 		.ascii	"loopTime\000"
+ 3403      54696D65 
+ 3403      00
+ 3404              	.LASF27:
+ 3405 0081 6D61696E 		.ascii	"main\000"
+ 3405      00
+ 3406              	.LASF57:
+ 3407 0086 5F777269 		.ascii	"_write\000"
+ 3407      746500
+ 3408              	.LASF46:
+ 3409 008d 64656C61 		.ascii	"delay\000"
+ 3409      7900
+ 3410              	.LASF6:
+ 3411 0093 5F5F7569 		.ascii	"__uint16_t\000"
+ 3411      6E743136 
+ 3411      5F7400
+ 3412              	.LASF58:
+ 3413 009e 66696C65 		.ascii	"file\000"
+ 3413      00
+ 3414              	.LASF43:
+ 3415 00a3 6C617374 		.ascii	"lastErrorLeft\000"
+ 3415      4572726F 
+ 3415      724C6566 
+ 3415      7400
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 76
+
+
+ 3416              	.LASF54:
+ 3417 00b1 6F766572 		.ascii	"over\000"
+ 3417      00
+ 3418              	.LASF41:
+ 3419 00b6 6C617374 		.ascii	"lastRight\000"
+ 3419      52696768 
+ 3419      7400
+ 3420              	.LASF32:
+ 3421 00c0 6C656453 		.ascii	"ledState\000"
+ 3421      74617465 
+ 3421      00
+ 3422              	.LASF83:
+ 3423 00c9 73656E73 		.ascii	"sensors_\000"
+ 3423      6F72735F 
+ 3423      00
+ 3424              	.LASF15:
+ 3425 00d2 696E7431 		.ascii	"int16\000"
+ 3425      3600
+ 3426              	.LASF68:
+ 3427 00d8 6D6F746F 		.ascii	"motor_turn\000"
+ 3427      725F7475 
+ 3427      726E00
+ 3428              	.LASF26:
+ 3429 00e3 67657450 		.ascii	"getPIDValue\000"
+ 3429      49445661 
+ 3429      6C756500 
+ 3430              	.LASF75:
+ 3431 00ef 7265666C 		.ascii	"reflectance_start\000"
+ 3431      65637461 
+ 3431      6E63655F 
+ 3431      73746172 
+ 3431      7400
+ 3432              	.LASF72:
+ 3433 0101 55415254 		.ascii	"UART_1_Start\000"
+ 3433      5F315F53 
+ 3433      74617274 
+ 3433      00
+ 3434              	.LASF78:
+ 3435 010e 55415254 		.ascii	"UART_1_PutChar\000"
+ 3435      5F315F50 
+ 3435      75744368 
+ 3435      617200
+ 3436              	.LASF0:
+ 3437 011d 666C6F61 		.ascii	"float\000"
+ 3437      7400
+ 3438              	.LASF10:
+ 3439 0123 6C6F6E67 		.ascii	"long long int\000"
+ 3439      206C6F6E 
+ 3439      6720696E 
+ 3439      7400
+ 3440              	.LASF8:
+ 3441 0131 6C6F6E67 		.ascii	"long int\000"
+ 3441      20696E74 
+ 3441      00
+ 3442              	.LASF40:
+ 3443 013a 6C617374 		.ascii	"lastLeft\000"
+ 3443      4C656674 
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 77
+
+
+ 3443      00
+ 3444              	.LASF67:
+ 3445 0143 7072696E 		.ascii	"printf\000"
+ 3445      746600
+ 3446              	.LASF51:
+ 3447 014a 62757474 		.ascii	"button\000"
+ 3447      6F6E00
+ 3448              	.LASF21:
+ 3449 0151 696E7465 		.ascii	"integral\000"
+ 3449      6772616C 
+ 3449      00
+ 3450              	.LASF36:
+ 3451 015a 6C656674 		.ascii	"leftControl\000"
+ 3451      436F6E74 
+ 3451      726F6C00 
+ 3452              	.LASF44:
+ 3453 0166 696E7465 		.ascii	"intergalRight\000"
+ 3453      7267616C 
+ 3453      52696768 
+ 3453      7400
+ 3454              	.LASF45:
+ 3455 0174 696E7465 		.ascii	"intergalLeft\000"
+ 3455      7267616C 
+ 3455      4C656674 
+ 3455      00
+ 3456              	.LASF3:
+ 3457 0181 756E7369 		.ascii	"unsigned char\000"
+ 3457      676E6564 
+ 3457      20636861 
+ 3457      7200
+ 3458              	.LASF38:
+ 3459 018f 77686974 		.ascii	"white\000"
+ 3459      6500
+ 3460              	.LASF61:
+ 3461 0195 4144435F 		.ascii	"ADC_Battery_StartConvert\000"
+ 3461      42617474 
+ 3461      6572795F 
+ 3461      53746172 
+ 3461      74436F6E 
+ 3462              	.LASF17:
+ 3463 01ae 6C6F6E67 		.ascii	"long double\000"
+ 3463      20646F75 
+ 3463      626C6500 
+ 3464              	.LASF33:
+ 3465 01ba 62757474 		.ascii	"buttonState\000"
+ 3465      6F6E5374 
+ 3465      61746500 
+ 3466              	.LASF66:
+ 3467 01c6 42656570 		.ascii	"Beep\000"
+ 3467      00
+ 3468              	.LASF59:
+ 3469 01cb 5F726561 		.ascii	"_read\000"
+ 3469      6400
+ 3470              	.LASF2:
+ 3471 01d1 7369676E 		.ascii	"signed char\000"
+ 3471      65642063 
+ 3471      68617200 
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 78
+
+
+ 3472              	.LASF14:
+ 3473 01dd 696E7433 		.ascii	"int32_t\000"
+ 3473      325F7400 
+ 3474              	.LASF11:
+ 3475 01e5 6C6F6E67 		.ascii	"long long unsigned int\000"
+ 3475      206C6F6E 
+ 3475      6720756E 
+ 3475      7369676E 
+ 3475      65642069 
+ 3476              	.LASF84:
+ 3477 01fc 72656164 		.ascii	"readBatteryVoltage\000"
+ 3477      42617474 
+ 3477      65727956 
+ 3477      6F6C7461 
+ 3477      676500
+ 3478              	.LASF12:
+ 3479 020f 756E7369 		.ascii	"unsigned int\000"
+ 3479      676E6564 
+ 3479      20696E74 
+ 3479      00
+ 3480              	.LASF55:
+ 3481 021c 6C656674 		.ascii	"leftSpeed\000"
+ 3481      53706565 
+ 3481      6400
+ 3482              	.LASF13:
+ 3483 0226 75696E74 		.ascii	"uint16_t\000"
+ 3483      31365F74 
+ 3483      00
+ 3484              	.LASF62:
+ 3485 022f 4144435F 		.ascii	"ADC_Battery_IsEndConversion\000"
+ 3485      42617474 
+ 3485      6572795F 
+ 3485      4973456E 
+ 3485      64436F6E 
+ 3486              	.LASF35:
+ 3487 024b 73706565 		.ascii	"speed\000"
+ 3487      6400
+ 3488              	.LASF87:
+ 3489 0251 70757473 		.ascii	"puts\000"
+ 3489      00
+ 3490              	.LASF19:
+ 3491 0256 63757272 		.ascii	"current\000"
+ 3491      656E7400 
+ 3492              	.LASF31:
+ 3493 025e 6C656454 		.ascii	"ledTime\000"
+ 3493      696D6500 
+ 3494              	.LASF48:
+ 3495 0266 73746172 		.ascii	"start\000"
+ 3495      7400
+ 3496              	.LASF5:
+ 3497 026c 73686F72 		.ascii	"short unsigned int\000"
+ 3497      7420756E 
+ 3497      7369676E 
+ 3497      65642069 
+ 3497      6E7400
+ 3498              	.LASF34:
+ 3499 027f 62757474 		.ascii	"buttonValue\000"
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 79
+
+
+ 3499      6F6E5661 
+ 3499      6C756500 
+ 3500              	.LASF85:
+ 3501 028b 73746174 		.ascii	"status\000"
+ 3501      757300
+ 3502              	.LASF29:
+ 3503 0292 766F6C74 		.ascii	"volts\000"
+ 3503      7300
+ 3504              	.LASF69:
+ 3505 0298 6D6F746F 		.ascii	"motor_forward\000"
+ 3505      725F666F 
+ 3505      72776172 
+ 3505      6400
+ 3506              	.LASF49:
+ 3507 02a6 73746F70 		.ascii	"stop\000"
+ 3507      00
+ 3508              	.LASF16:
+ 3509 02ab 63686172 		.ascii	"char\000"
+ 3509      00
+ 3510              	.LASF52:
+ 3511 02b0 6C656674 		.ascii	"left\000"
+ 3511      00
+ 3512              	.LASF42:
+ 3513 02b5 6C617374 		.ascii	"lastErrorRight\000"
+ 3513      4572726F 
+ 3513      72526967 
+ 3513      687400
+ 3514              	.LASF64:
+ 3515 02c4 42617474 		.ascii	"BatteryLed_Write\000"
+ 3515      6572794C 
+ 3515      65645F57 
+ 3515      72697465 
+ 3515      00
+ 3516              	.LASF70:
+ 3517 02d5 5357315F 		.ascii	"SW1_Read\000"
+ 3517      52656164 
+ 3517      00
+ 3518              	.LASF81:
+ 3519 02de 6D61696E 		.ascii	"main.c\000"
+ 3519      2E6300
+ 3520              	.LASF9:
+ 3521 02e5 6C6F6E67 		.ascii	"long unsigned int\000"
+ 3521      20756E73 
+ 3521      69676E65 
+ 3521      6420696E 
+ 3521      7400
+ 3522              	.LASF74:
+ 3523 02f7 73656E73 		.ascii	"sensor_isr_StartEx\000"
+ 3523      6F725F69 
+ 3523      73725F53 
+ 3523      74617274 
+ 3523      457800
+ 3524              	.LASF76:
+ 3525 030a 6D6F746F 		.ascii	"motor_start\000"
+ 3525      725F7374 
+ 3525      61727400 
+ 3526              	.LASF60:
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 80
+
+
+ 3527 0316 636F756E 		.ascii	"count\000"
+ 3527      7400
+ 3528              	.LASF73:
+ 3529 031c 4144435F 		.ascii	"ADC_Battery_Start\000"
+ 3529      42617474 
+ 3529      6572795F 
+ 3529      53746172 
+ 3529      7400
+ 3530              	.LASF7:
+ 3531 032e 5F5F696E 		.ascii	"__int32_t\000"
+ 3531      7433325F 
+ 3531      7400
+ 3532              	.LASF65:
+ 3533 0338 7265666C 		.ascii	"reflectance_read\000"
+ 3533      65637461 
+ 3533      6E63655F 
+ 3533      72656164 
+ 3533      00
+ 3534              	.LASF63:
+ 3535 0349 4144435F 		.ascii	"ADC_Battery_GetResult16\000"
+ 3535      42617474 
+ 3535      6572795F 
+ 3535      47657452 
+ 3535      6573756C 
+ 3536              	.LASF23:
+ 3537 0361 61646372 		.ascii	"adcresult\000"
+ 3537      6573756C 
+ 3537      7400
+ 3538              	.LASF24:
+ 3539 036b 6572726F 		.ascii	"error\000"
+ 3539      7200
+ 3540              	.LASF82:
+ 3541 0371 433A5C50 		.ascii	"C:\\PSoC\\Zumo01\\ZumoBot.cydsn\000"
+ 3541      536F435C 
+ 3541      5A756D6F 
+ 3541      30315C5A 
+ 3541      756D6F42 
+ 3542              	.LASF1:
+ 3543 038e 646F7562 		.ascii	"double\000"
+ 3543      6C6500
+ 3544              	.LASF88:
+ 3545 0395 5F5F6275 		.ascii	"__builtin_puts\000"
+ 3545      696C7469 
+ 3545      6E5F7075 
+ 3545      747300
+ 3546              	.LASF86:
+ 3547 03a4 49544D5F 		.ascii	"ITM_RxBuffer\000"
+ 3547      52784275 
+ 3547      66666572 
+ 3547      00
+ 3548              	.LASF80:
+ 3549 03b1 474E5520 		.ascii	"GNU C11 5.4.1 20160609 (release) [ARM/embedded-5-br"
+ 3549      43313120 
+ 3549      352E342E 
+ 3549      31203230 
+ 3549      31363036 
+ 3550 03e4 616E6368 		.ascii	"anch revision 237715] -mcpu=cortex-m3 -mthumb -g -O"
+ARM GAS  C:\Users\TUOMAS~1\AppData\Local\Temp\ccqcCZQb.s 			page 81
+
+
+ 3550      20726576 
+ 3550      6973696F 
+ 3550      6E203233 
+ 3550      37373135 
+ 3551 0417 67202D66 		.ascii	"g -ffunction-sections -ffat-lto-objects\000"
+ 3551      66756E63 
+ 3551      74696F6E 
+ 3551      2D736563 
+ 3551      74696F6E 
+ 3552              	.LASF71:
+ 3553 043f 43794465 		.ascii	"CyDelay\000"
+ 3553      6C617900 
+ 3554              	.LASF77:
+ 3555 0447 49525F6C 		.ascii	"IR_led_Write\000"
+ 3555      65645F57 
+ 3555      72697465 
+ 3555      00
+ 3556              		.ident	"GCC: (GNU Tools for ARM Embedded Processors) 5.4.1 20160609 (release) [ARM/embedded-5-bran
